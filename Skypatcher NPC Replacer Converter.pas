@@ -10,6 +10,7 @@ var
   baseFile, replacerMod: string;
   isESL,useFormID: boolean;
   copyCount: Cardinal;
+  missingFacegeom, missingFacetint: boolean;
 
 function Initialize: integer;
 begin
@@ -61,6 +62,10 @@ begin
   // 元ファイルが存在するか確認
   if not FileExists(oldPath) then begin
     AddMessage('File not found: ' + oldPath);
+    if MeshMode then
+      missingFacegeom := true
+    else
+      missingFacetint := true;
     Exit;
   end;
 
@@ -119,6 +124,10 @@ begin
     AddMessage('This plugin has not ESL Flag!');
 }
 
+  // Facegenファイルのフラグを初期化
+  missingFacegeom := false;
+  missingFacetint := false;
+
   // Mod名を取得（レコードが所属するファイル名）
   replacerMod := GetFileName(GetFile(e));
   baseFile := GetFileName(GetFile(MasterOrSelf(e)));
@@ -159,28 +168,36 @@ begin
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   // 顔ファイルを新しいパスにコピー&リネーム
-  if not CopyFaceGenFile(oldMeshPath, newMeshPath, meshMode) then
+  if not CopyFaceGenFile(oldMeshPath, newMeshPath, meshMode) then begin
     AddMessage('failed copy FaceGeom file');
+    if missingFacegeom then
+    AddMessage('FaceGeom file is missing');
+    end;
 
-  if not CopyFaceGenFile(oldTexturePath, newTexturePath, textureMode) then
+  if not CopyFaceGenFile(oldTexturePath, newTexturePath, textureMode) then begin
     AddMessage('failed copy FaceTint file');
+    if missingFacetint then
+    AddMessage('FaceTint file is missing');
+    end;
 
   // 出力ファイル用の配列操作
-  if useFormID then begin
-    // TODO;formIDからパディングされた0を取り除く
-    trimedOldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
-    trimedNewformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
-    
-    slBaseID := baseFile + '|' + trimedOldFormID;
-    slReplacerID := replacerMod + '|' + trimedNewFormID;
-  end
-  else begin
-    slBaseID := oldEditorID;
-    slReplacerID := newEditorID;
+  if not missingFacegeom and not missingFacetint then begin
+    if useFormID then begin
+      // TODO;formIDからパディングされた0を取り除く
+      trimedOldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
+      trimedNewformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
+      
+      slBaseID := baseFile + '|' + trimedOldFormID;
+      slReplacerID := replacerMod + '|' + trimedNewFormID;
+    end
+    else begin
+      slBaseID := oldEditorID;
+      slReplacerID := newEditorID;
+    end;
+
+    slExport.Add(';' + GetElementEditValues(e, 'FULL'));
+    slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slReplacerID + #13#10);
   end;
-  
-  slExport.Add(';' + GetElementEditValues(e, 'FULL'));
-  slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slReplacerID + #13#10);
 
   // コピー元レコードを削除
   Remove(e);
