@@ -23,6 +23,7 @@ begin
   copyCount      := 0;
 
   // 出力ファイルに使うのはFormIDとEditorIDのどちらか確認
+  // TODO:デフォルトをEditor IDに変更（Yes:Editor ID No: Form ID)
   if MessageDlg('Use FormID for output? (Yes: FormID, No: EditorID)', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
     useFormID := true
   else
@@ -33,6 +34,7 @@ begin
     addSemicolon := ';';
 
   // プレフィックスを入力
+  // TODO:入力が空だった場合に再度入力を求めるように変更
   prefix := InputBox('New Editor ID Prefix Input', 'Enter the prefix. ''_'' will be added:', '');
   AddMessage('Prefix set to: ' + prefix);
 
@@ -102,16 +104,6 @@ begin
 
   // TODO:複数のプラグインを選択していたらスキップ
 
-  // TODO:レコード数上限に達していたらスキップ
-
-  // NPCレコードでなければスキップ
-  if Signature(e) <> 'NPC_' then begin
-    AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC Record!');
-    Exit;
-  end;
-
-  // TODO:元レコードがマスターファイルではない場合ユーザに確認
-
 {
   // ESLフラグを取得
   ESLCheck := GetFile(e);
@@ -123,6 +115,16 @@ begin
   Else
     AddMessage('This plugin has not ESL Flag!');
 }
+
+  // TODO:レコード数上限に達していたらスキップ
+
+  // NPCレコードでなければスキップ
+  if Signature(e) <> 'NPC_' then begin
+    AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC Record!');
+    Exit;
+  end;
+
+  // TODO:元レコードがマスターファイルではない場合ユーザに確認
 
   // Facegenファイルのフラグを初期化
   missingFacegeom := false;
@@ -145,10 +147,6 @@ begin
     Exit;
   end;
 
-  // レコードのコピー回数をカウント
-//  Inc(copyCount);
-  //  AddMessage('copyCount: ' + IntToStr(copyCount));
-
   // 新しいEditor IDを設定
   SetElementEditValues(newRecord, 'EDID', newEditorID);
   //AddMessage('Created new record with Editor ID: ' + newEditorID);
@@ -170,20 +168,21 @@ begin
   // 顔ファイルを新しいパスにコピー&リネーム
   if not CopyFaceGenFile(oldMeshPath, newMeshPath, meshMode) then begin
     AddMessage('failed copy FaceGeom file');
-    if missingFacegeom then
-    AddMessage('FaceGeom file is missing');
-    end;
+//    if missingFacegeom then
+//    AddMessage('FaceGeom file is missing');
+//    end;
 
   if not CopyFaceGenFile(oldTexturePath, newTexturePath, textureMode) then begin
     AddMessage('failed copy FaceTint file');
-    if missingFacetint then
-    AddMessage('FaceTint file is missing');
-    end;
+//    if missingFacetint then
+//    AddMessage('FaceTint file is missing');
+//    end;
 
   // 出力ファイル用の配列操作
+  // Facegenファイルが見つからなかった場合はiniファイルへの追記をスキップ
   if not missingFacegeom and not missingFacetint then begin
     if useFormID then begin
-      // TODO;formIDからパディングされた0を取り除く
+      // TODO:formIDからパディングされた0を取り除く
       trimedOldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
       trimedNewformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
       
@@ -198,6 +197,8 @@ begin
     slExport.Add(';' + GetElementEditValues(e, 'FULL'));
     slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slReplacerID + #13#10);
   end;
+  // TODO:テンプレートを利用しているNPCだった場合は正常処理なのでその旨を表示
+  // TODO:テンプレートを利用していなかった場合は異常処理なのでその旨を表示
 
   // コピー元レコードを削除
   Remove(e);
@@ -212,6 +213,7 @@ begin
   if slExport.Count <> 0 then 
   begin
 
+  // TODO:出力先のフォルダ階層を追加"npc\Skypatcher NPC Rplacer Converter\"
   saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\';
   if not DirectoryExists(saveDir) then
     ForceDirectories(saveDir);
