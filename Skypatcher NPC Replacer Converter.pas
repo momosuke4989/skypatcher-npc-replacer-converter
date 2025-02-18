@@ -233,8 +233,8 @@ begin
   if slExport.Count <> 0 then 
   begin
 
-  // TODO:出力先のフォルダ階層を追加"npc\Skypatcher NPC Rplacer Converter\"
-  saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\';
+  // TODO:出力先のフォルダ階層を追加"npc\Skypatcher NPC Replacer Converter\"
+  saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\Skypatcher NPC Replacer Converter\';
   if not DirectoryExists(saveDir) then
     ForceDirectories(saveDir);
 
