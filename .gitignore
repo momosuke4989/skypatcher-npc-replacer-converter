@@ -38,4 +38,8 @@ Thumbs.db
 
 # Ignore Folders #
 ##################
-backup\
+samples\
+
+# My settings #
+###############
+*.lnk

@@ -22,6 +22,7 @@ begin
   Result         := 0;
 
   // 出力ファイルに使うのはFormIDとEditorIDのどちらか確認
+  // TODO:デフォルトをEditor IDに変更（Yes:Editor ID No: Form ID)
   if MessageDlg('Use Editor ID for output? (Yes: Editor ID, No: Form ID)', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
     useFormID := true
   else
@@ -32,20 +33,28 @@ begin
     addSemicolon := ';';
 
   // プレフィックスを入力
-  // TODO:入力チェック処理（必要？）
+  // TODO:入力が空だった場合に再度入力を求めるように変更
   repeat
-    isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z), digits (0-9), and the underscore (_) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
+    isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Alphanumeric characters and _ are allowed.' + #13#10 + '_ will be added to the prefix you enter:', prefix);
     if not isInputProvided then
     begin
       MessageDlg('Cancel was pressed, aborting the script.', mtInformation, [mbOK], 0);
       Result := -1;
-      Exit;
+      Exit; // スクリプトを終了
     end
     else if prefix = '' then
     begin
       MessageDlg('Input is empty. Please reenter prefix.', mtInformation, [mbOK], 0);
     end;
   until (isInputProvided) and (prefix <> '');
+  
+  
+  
+//  repeat
+//    prefix := InputBox('New Editor ID Prefix Input', 'Enter the prefix. Alphanumeric characters and _ are allowed.' + #13#10 + '_ will be added to the prefix you enter:', '');
+//    if prefix ='' then
+//      ShowMessage('Input is empty. Please reenter prefix.');
+//  until prefix <> '';
 
   AddMessage('Prefix set to: ' + prefix);
 
@@ -128,9 +137,8 @@ begin
 }
 
   // TODO:レコード数上限に達していたらスクリプトを中止する
-  // TODO:ESLレコードのバージョンを確認する。1.7.1以降なら最大数は4096 それ以下は2048
-  
-  // TODO:元レコードがマスターファイルではない場合ユーザに確認。Mod用リプレイサーの編集ならOK、他の普通のModならNG
+
+  // TODO:元レコードがマスターファイルではない場合ユーザに確認
 
   // NPCレコードでなければスキップ
   if Signature(e) <> 'NPC_' then begin
@@ -153,7 +161,6 @@ begin
   newEditorID := prefix + '_' + oldEditorID;
 
   // レコードを複製
-  // TODO:ESLフラグ持ちの場合、FormIDが不正になる可能性があるのでチェック処理を追加（必要？）
   newRecord := wbCopyElementToFile(e, GetFile(e), True, True);
   if not Assigned(newRecord) then begin
     AddMessage('Error: Failed to copy record for ' + Name(e));
@@ -181,17 +188,15 @@ begin
   // 顔ファイルを新しいパスにコピー&リネーム
   if not CopyFaceGenFile(oldMeshPath, newMeshPath, meshMode) then begin
     AddMessage('failed copy FaceGeom file');
-//    if missingFacegeom then
-//    AddMessage('FaceGeom file is missing');
+    if missingFacegeom then
+    AddMessage('FaceGeom file is missing');
     end;
 
   if not CopyFaceGenFile(oldTexturePath, newTexturePath, textureMode) then begin
     AddMessage('failed copy FaceTint file');
-//    if missingFacetint then
-//    AddMessage('FaceTint file is missing');
+    if missingFacetint then
+    AddMessage('FaceTint file is missing');
     end;
-    
-  // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する（必要？）
 
   // 出力ファイル用の配列操作
   // Facegenファイルが見つからなかった場合はiniファイルへの追記をスキップ
@@ -211,15 +216,9 @@ begin
 
     slExport.Add(';' + GetElementEditValues(e, 'FULL'));
     slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slReplacerID + #13#10);
-  end else begin
-    AddMessage('Facegen files copy was failed. Skip adding to this record line into Skypatcher ini file.');
-    // テンプレートを利用しているNPCだった場合は正常処理なのでその旨を表示
-    if not (GetElementEditValues(e, 'TPLT') = '') then
-      AddMessage('This NPC record is made from templates. Some NPC records that use templates do not have a Facegen files, so copying may fail, but this is normal.')
-    else
-    // テンプレートを利用していなかった場合は異常処理なのでその旨を表示
-      AddMessage('This NPC record should have Facegen files but not found. There may be a problem with the mod file structure.');
   end;
+  // TODO:テンプレートを利用しているNPCだった場合は正常処理なのでその旨を表示
+  // TODO:テンプレートを利用していなかった場合は異常処理なのでその旨を表示
 
   // コピー元レコードを削除
   Remove(e);
@@ -233,8 +232,9 @@ var
 begin
   if slExport.Count <> 0 then 
   begin
-  // Skypatcher iniファイルの出力処理
-  saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\Skypatcher NPC Replacer Converter\';
+
+  // TODO:出力先のフォルダ階層を追加"npc\Skypatcher NPC Rplacer Converter\"
+  saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\';
   if not DirectoryExists(saveDir) then
     ForceDirectories(saveDir);
 

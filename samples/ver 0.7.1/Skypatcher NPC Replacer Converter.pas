@@ -7,22 +7,23 @@ uses xEditAPI, SysUtils, StrUtils, Windows;
 var
   slExport: TStringList;
   prefix, addSemicolon: string;
-  baseFile, replacerFile: string;
-  isESL, useFormID, isInputProvided: boolean;
+  baseFile, replacerMod: string;
+  isESL,useFormID: boolean;
+  copyCount: Cardinal;
   missingFacegeom, missingFacetint: boolean;
 
 function Initialize: integer;
 begin
   slExport       := TStringList.Create;
-  isESL          := false;
-  isInputProvided:= false;
-  baseFile       := '';
-  replacerFile   := '';
-  addSemicolon   := '';
   Result         := 0;
+  isESL          := false;
+  baseFile       := '';
+  replacerMod    := '';
+  addSemicolon   := '';
+  copyCount      := 0;
 
   // 出力ファイルに使うのはFormIDとEditorIDのどちらか確認
-  if MessageDlg('Use Editor ID for output? (Yes: Editor ID, No: Form ID)', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
+  if MessageDlg('Use FormID for output? (Yes: FormID, No: EditorID)', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
     useFormID := true
   else
     useFormID := false;
@@ -32,26 +33,12 @@ begin
     addSemicolon := ';';
 
   // プレフィックスを入力
-  // TODO:入力チェック処理（必要？）
-  repeat
-    isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z), digits (0-9), and the underscore (_) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
-    if not isInputProvided then
-    begin
-      MessageDlg('Cancel was pressed, aborting the script.', mtInformation, [mbOK], 0);
-      Result := -1;
-      Exit;
-    end
-    else if prefix = '' then
-    begin
-      MessageDlg('Input is empty. Please reenter prefix.', mtInformation, [mbOK], 0);
-    end;
-  until (isInputProvided) and (prefix <> '');
-
+  prefix := InputBox('New Editor ID Prefix Input', 'Enter the prefix. ''_'' will be added:', '');
   AddMessage('Prefix set to: ' + prefix);
 
 end;
 
-function IsMasterAEPlugin(plugin: IInterface): Boolean;
+function IsMasterSAEPlugin(plugin: IInterface): Boolean;
 var
   PluginName  : String;
 Begin
@@ -107,13 +94,23 @@ var
   oldEditorID, newEditorID, slBaseID, slReplacerID: string;
   oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string;
 begin
-  //  マスターファイルを編集しようとしていたら中止
-  if IsMasterAEPlugin(e) then begin
+  //  マスターファイルを編集しようとしていたらスキップ
+  if IsMasterSAEPlugin(e) then begin
     AddMessage(GetElementEditValues(e, 'EDID') + ' is a member of ' + GetFileName(e) + '! Do not Edit it!');
     Exit;
   end;
 
-  // TODO:複数のプラグインを選択していたら中止
+  // TODO:複数のプラグインを選択していたらスキップ
+
+  // TODO:レコード数上限に達していたらスキップ
+
+  // NPCレコードでなければスキップ
+  if Signature(e) <> 'NPC_' then begin
+    AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC Record!');
+    Exit;
+  end;
+
+  // TODO:元レコードがマスターファイルではない場合ユーザに確認
 
 {
   // ESLフラグを取得
@@ -127,23 +124,12 @@ begin
     AddMessage('This plugin has not ESL Flag!');
 }
 
-  // TODO:レコード数上限に達していたらスクリプトを中止する
-  // TODO:ESLレコードのバージョンを確認する。1.7.1以降なら最大数は4096 それ以下は2048
-  
-  // TODO:元レコードがマスターファイルではない場合ユーザに確認。Mod用リプレイサーの編集ならOK、他の普通のModならNG
-
-  // NPCレコードでなければスキップ
-  if Signature(e) <> 'NPC_' then begin
-    AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC Record!');
-    Exit;
-  end;
-
   // Facegenファイルのフラグを初期化
   missingFacegeom := false;
   missingFacetint := false;
 
   // Mod名を取得（レコードが所属するファイル名）
-  replacerFile := GetFileName(GetFile(e));
+  replacerMod := GetFileName(GetFile(e));
   baseFile := GetFileName(GetFile(MasterOrSelf(e)));
   
   // コピー元のEditor IDを取得
@@ -153,12 +139,15 @@ begin
   newEditorID := prefix + '_' + oldEditorID;
 
   // レコードを複製
-  // TODO:ESLフラグ持ちの場合、FormIDが不正になる可能性があるのでチェック処理を追加（必要？）
   newRecord := wbCopyElementToFile(e, GetFile(e), True, True);
   if not Assigned(newRecord) then begin
     AddMessage('Error: Failed to copy record for ' + Name(e));
     Exit;
   end;
+
+  // レコードのコピー回数をカウント
+//  Inc(copyCount);
+  //  AddMessage('copyCount: ' + IntToStr(copyCount));
 
   // 新しいEditor IDを設定
   SetElementEditValues(newRecord, 'EDID', newEditorID);
@@ -170,39 +159,36 @@ begin
 
   oldMeshPath := GetFaceGenPath(baseFile, oldformID, meshMode);
 //    AddMessage('oldMeshPath:' + oldMeshPath);
-  newMeshPath := GetFaceGenPath(replacerFile, newformID, meshMode);
+  newMeshPath := GetFaceGenPath(replacerMod, newformID, meshMode);
 //    AddMessage('newMeshPath:' + newMeshPath);
     
   oldTexturePath := GetFaceGenPath(baseFile, oldformID, textureMode);
 //    AddMessage('oldTexturePath:' + oldTexturePath);
-  newTexturePath := GetFaceGenPath(replacerFile, newformID, textureMode);
+  newTexturePath := GetFaceGenPath(replacerMod, newformID, textureMode);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   // 顔ファイルを新しいパスにコピー&リネーム
   if not CopyFaceGenFile(oldMeshPath, newMeshPath, meshMode) then begin
     AddMessage('failed copy FaceGeom file');
-//    if missingFacegeom then
-//    AddMessage('FaceGeom file is missing');
+    if missingFacegeom then
+    AddMessage('FaceGeom file is missing');
     end;
 
   if not CopyFaceGenFile(oldTexturePath, newTexturePath, textureMode) then begin
     AddMessage('failed copy FaceTint file');
-//    if missingFacetint then
-//    AddMessage('FaceTint file is missing');
+    if missingFacetint then
+    AddMessage('FaceTint file is missing');
     end;
-    
-  // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する（必要？）
 
   // 出力ファイル用の配列操作
-  // Facegenファイルが見つからなかった場合はiniファイルへの追記をスキップ
   if not missingFacegeom and not missingFacetint then begin
     if useFormID then begin
-      // TODO:formIDからパディングされた0を取り除く
+      // TODO;formIDからパディングされた0を取り除く
       trimedOldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
       trimedNewformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
       
       slBaseID := baseFile + '|' + trimedOldFormID;
-      slReplacerID := replacerFile + '|' + trimedNewFormID;
+      slReplacerID := replacerMod + '|' + trimedNewFormID;
     end
     else begin
       slBaseID := oldEditorID;
@@ -211,14 +197,6 @@ begin
 
     slExport.Add(';' + GetElementEditValues(e, 'FULL'));
     slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slReplacerID + #13#10);
-  end else begin
-    AddMessage('Facegen files copy was failed. Skip adding to this record line into Skypatcher ini file.');
-    // テンプレートを利用しているNPCだった場合は正常処理なのでその旨を表示
-    if not (GetElementEditValues(e, 'TPLT') = '') then
-      AddMessage('This NPC record is made from templates. Some NPC records that use templates do not have a Facegen files, so copying may fail, but this is normal.')
-    else
-    // テンプレートを利用していなかった場合は異常処理なのでその旨を表示
-      AddMessage('This NPC record should have Facegen files but not found. There may be a problem with the mod file structure.');
   end;
 
   // コピー元レコードを削除
@@ -233,8 +211,8 @@ var
 begin
   if slExport.Count <> 0 then 
   begin
-  // Skypatcher iniファイルの出力処理
-  saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\Skypatcher NPC Replacer Converter\';
+
+  saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\';
   if not DirectoryExists(saveDir) then
     ForceDirectories(saveDir);
 
@@ -243,7 +221,7 @@ begin
       dlgSave.Options := dlgSave.Options + [ofOverwritePrompt];
       dlgSave.Filter := 'Ini (*.ini)|*.ini';
       dlgSave.InitialDir := saveDir;
-      dlgSave.FileName := replacerFile + '.ini';
+      dlgSave.FileName := replacerMod + '.ini';
   if dlgSave.Execute then 
     begin
       ExportFileName := dlgSave.FileName;
