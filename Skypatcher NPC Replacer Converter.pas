@@ -3,7 +3,9 @@ unit UserScript;
 interface
 implementation
 uses xEditAPI, SysUtils, StrUtils, Windows;
-
+const
+  MeshMode = true;
+  TextureMode = false;
 var
   slExport: TStringList;
   prefix, addSemicolon: string;
@@ -64,15 +66,21 @@ Begin
   Result := (CompareStr(PluginName, 'Skyrim.esm') = 0) or (CompareStr(PluginName, 'Update.esm') = 0) or (CompareStr(PluginName, 'Dawnguard.esm') = 0) or (CompareStr(PluginName, 'HearthFires.esm') = 0) or (CompareStr(PluginName, 'Dragonborn.esm') = 0) or (CompareStr(PluginName, 'ccBGSSSE001-Fish.esm') = 0) or (CompareStr(PluginName, 'ccQDRSSE001-SurvivalMode.esl') = 0) or (CompareStr(PluginName, 'ccBGSSSE037-Curios.esl') = 0) or (CompareStr(PluginName, 'ccBGSSSE025-AdvDSGS.esm') = 0) or (CompareStr(PluginName, '_ResourcePack.esl') = 0);
 End;
 
-function GetFaceGenPath(pluginName, formID: string; MeshMode: boolean): string;
+function GetFaceGenPath(pluginName, formID: string; isNewPath, Mode: boolean): string;
 begin
-  if MeshMode then
-    Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
-  if not MeshMode then
-    Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
+  if Mode = MeshMode then
+    if isNewPath = true then
+      Result := Format('%sSkypatcher NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
+    else
+      Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
+  if Mode = TextureMode then
+    if isNewPath = true then
+      Result := Format('%sSkypatcher NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
+    else
+      Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
 
-function ManipulateFaceGenFile(oldPath, newPath: string; removeFlag, MeshMode: boolean): boolean;
+function ManipulateFaceGenFile(oldPath, newPath: string; removeFlag, Mode: boolean): boolean;
 var
   Result : boolean;
 begin
@@ -80,7 +88,7 @@ begin
   // 元ファイルが存在するか確認
   if not FileExists(oldPath) then begin
     AddMessage('File not found: ' + oldPath);
-    if MeshMode then
+    if Mode = MeshMode then
       missingFacegeom := true
     else
       missingFacetint := true;
@@ -110,9 +118,7 @@ begin
 end;
 
 function Process(e: IInterface): integer;
-const
-  meshMode = true;
-  textureMode = false;
+
 var
   ESLCheck: IInterface;
   newRecord: IInterface;
@@ -182,24 +188,24 @@ begin
   oldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
   newformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
 
-  oldMeshPath := GetFaceGenPath(baseFile, oldformID, meshMode);
+  oldMeshPath := GetFaceGenPath(baseFile, oldformID, false, MeshMode);
 //    AddMessage('oldMeshPath:' + oldMeshPath);
-  newMeshPath := GetFaceGenPath(replacerFile, newformID, meshMode);
+  newMeshPath := GetFaceGenPath(replacerFile, newformID, true, MeshMode);
 //    AddMessage('newMeshPath:' + newMeshPath);
     
-  oldTexturePath := GetFaceGenPath(baseFile, oldformID, textureMode);
+  oldTexturePath := GetFaceGenPath(baseFile, oldformID, false, TextureMode);
 //    AddMessage('oldTexturePath:' + oldTexturePath);
-  newTexturePath := GetFaceGenPath(replacerFile, newformID, textureMode);
+  newTexturePath := GetFaceGenPath(replacerFile, newformID, true, TextureMode);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   // 顔ファイルを新しいパスにコピー&リネームまたは移動&リネーム
-  if not ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, meshMode) then begin
+  if not ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MeshMode) then begin
     AddMessage('failed copy FaceGeom file');
 //    if missingFacegeom then
 //    AddMessage('FaceGeom file is missing');
     end;
 
-  if not ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, textureMode) then begin
+  if not ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TextureMode) then begin
     AddMessage('failed copy FaceTint file');
 //    if missingFacetint then
 //    AddMessage('FaceTint file is missing');
@@ -256,7 +262,7 @@ begin
   if slExport.Count <> 0 then 
   begin
   // Skypatcher iniファイルの出力処理
-  saveDir := DataPath + 'SKSE\Plugins\Skypatcher\npc\Skypatcher NPC Replacer Converter\';
+  saveDir := DataPath + 'Skypatcher NPC Replacer Converter\SKSE\Plugins\Skypatcher\npc\Skypatcher NPC Replacer Converter\';
   if not DirectoryExists(saveDir) then
     ForceDirectories(saveDir);
 
