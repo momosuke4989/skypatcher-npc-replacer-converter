@@ -9,13 +9,14 @@ var
   prefix, addSemicolon: string;
   baseFile, replacerFile: string;
   isESL, useFormID, isInputProvided: boolean;
-  missingFacegeom, missingFacetint: boolean;
+  removeFacegen, missingFacegeom, missingFacetint : boolean;
 
 function Initialize: integer;
 begin
   slExport       := TStringList.Create;
   isESL          := false;
   isInputProvided:= false;
+  removeFacegen  := false;
   baseFile       := '';
   replacerFile   := '';
   addSemicolon   := '';
@@ -30,6 +31,10 @@ begin
   // 出力ファイルのデフォルト設定をすべて有効にするか確認
   if MessageDlg('Enable output ini file by default? (Yes: Enable, No: Disable)', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
     addSemicolon := ';';
+
+  // コピー元のFacegenファイルを残すかどうか確認
+  if MessageDlg('Do you want to keep the Facegen files in the Replacer Mod? (Yes: Keep, No: Remove)'  + #13#10#13#10 +  'Important: If you choose to remove, the file structure of the Replacer Mod will be changed. If you are not sure what this option does,choose to keep.', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
+    removeFacegen := true;
 
   // プレフィックスを入力
   // TODO:入力チェック処理（必要？）
@@ -67,7 +72,7 @@ begin
     Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
 
-function CopyFaceGenFile(oldPath, newPath: string; MeshMode: boolean): boolean;
+function ManipulateFaceGenFile(oldPath, newPath: string; removeFlag, MeshMode: boolean): boolean;
 var
   Result : boolean;
 begin
@@ -86,12 +91,21 @@ begin
   if not DirectoryExists(ExtractFilePath(newPath)) then
     ForceDirectories(ExtractFilePath(newPath));
 
-  // ファイルをコピー
-  if CopyFile(PChar(oldPath), PChar(newPath), False) then begin
-    AddMessage('Copied: ' + oldPath + ' -> ' + newPath);
-    Result := true;
-  end else
-    AddMessage('Failed to copy: ' + oldPath);
+  if removeFlag then begin
+    if RenameFile(PChar(oldPath), PChar(newPath)) then begin
+      AddMessage('Move to: ' + oldPath + ' -> ' + newPath);
+      Result := true;
+    end else
+      AddMessage('Failed to move: ' + oldPath);
+  end
+  else begin
+    // ファイルをコピー
+    if CopyFile(PChar(oldPath), PChar(newPath), False) then begin
+      AddMessage('Copied: ' + oldPath + ' -> ' + newPath);
+      Result := true;
+    end else
+      AddMessage('Failed to copy: ' + oldPath);
+  end;
 
 end;
 
@@ -178,14 +192,14 @@ begin
   newTexturePath := GetFaceGenPath(replacerFile, newformID, textureMode);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
-  // 顔ファイルを新しいパスにコピー&リネーム
-  if not CopyFaceGenFile(oldMeshPath, newMeshPath, meshMode) then begin
+  // 顔ファイルを新しいパスにコピー&リネームまたは移動&リネーム
+  if not ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, meshMode) then begin
     AddMessage('failed copy FaceGeom file');
 //    if missingFacegeom then
 //    AddMessage('FaceGeom file is missing');
     end;
 
-  if not CopyFaceGenFile(oldTexturePath, newTexturePath, textureMode) then begin
+  if not ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, textureMode) then begin
     AddMessage('failed copy FaceTint file');
 //    if missingFacetint then
 //    AddMessage('FaceTint file is missing');
@@ -209,8 +223,9 @@ begin
       slReplacerID := newEditorID;
     end;
 
+    // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映
     wnamID := IntToHex64(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 8);
-      AddMessage('wnamID is:' + wnamID);
+//      AddMessage('wnamID is:' + wnamID);
     if wnamID = '00000000' then
       slSkinID := slReplacerID
     else
