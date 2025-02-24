@@ -104,7 +104,7 @@ var
   newRecord: IInterface;
   oldformID, newformID, trimedOldformID, trimedNewformID: String; 
   trimDigits:   Cardinal;
-  oldEditorID, newEditorID, slBaseID, slReplacerID: string;
+  oldEditorID, newEditorID, slBaseID, slReplacerID, wnamID, slSkinID: string;
   oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string;
 begin
   //  マスターファイルを編集しようとしていたら中止
@@ -209,8 +209,15 @@ begin
       slReplacerID := newEditorID;
     end;
 
+    wnamID := IntToHex64(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 8);
+      AddMessage('wnamID is:' + wnamID);
+    if wnamID = '00000000' then
+      slSkinID := slReplacerID
+    else
+      slSkinID := replacerFile + '|' + wnamID;
+
     slExport.Add(';' + GetElementEditValues(e, 'FULL'));
-    slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slReplacerID + #13#10);
+    slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
   end else begin
     AddMessage('Facegen files copy was failed. Skip adding to this record line into Skypatcher ini file.');
     // テンプレートを利用しているNPCだった場合は正常処理なのでその旨を表示
