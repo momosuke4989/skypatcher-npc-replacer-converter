@@ -155,11 +155,11 @@ begin
   // Form IDの上限チェック
   // NPCレコードの数を取得
   NPCrecordNum := GetNPCRecordCount(f);
-//  AddMessage('NPC Records:' + IntToStr(NPCrecordNum));
+  AddMessage('NPC Records:' + IntToStr(NPCrecordNum));
   
   // 次に使用される Form ID の取得
   nextObjectID := GetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID');
-//  AddMessage('Next Object ID:' + IntToStr(nextObjectID));
+  AddMessage('Next Object ID:' + IntToStr(nextObjectID));
   
   // Next Object IDが不正かどうかチェック
   if headerVer < 1.71 then begin
