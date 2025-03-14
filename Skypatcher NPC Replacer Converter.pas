@@ -187,7 +187,7 @@ begin
     AddMessage('-- Fix Guide --');
     AddMessage('The script has stopped because the Form ID to be assigned to a newly generated record exceeds the valid range for ESL-flagged ESP.');
     AddMessage('Edit the Next Object ID value in the file header to an appropriate value.');
-    AddMessage('The expected appropriate value is ' + recommendedObjectID + '. If the NPC record contains records that does not override, subtract their count.');
+    AddMessage('The expected appropriate value is ' + recommendedObjectID + '. If the NPC record contains records that does not override, add their count.');
     AddMessage('If this value is already in use, set an available minimum value within the range of 800 to FFF (000 to FFF if the header version is 1.71 or higher).');
     Result := true;
     Exit;
