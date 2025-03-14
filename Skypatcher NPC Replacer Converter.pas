@@ -10,7 +10,10 @@ const
   NewESLMaxRecords = 4095;
   ESLMaxFormID = 4095;
   ESLMinFormID = 2048;
+  ExtESLVer = 1.71;
+
 var
+  stopFacegenManipulation:  boolean;
   slExport: TStringList;
   prefix, addSemicolon: string;
   firstRecordFileName, baseFileName, replacerFileName: string;
@@ -123,6 +126,7 @@ var
   recordNum, maxRecordNum, NPCrecordNum, nextObjectID: Cardinal;
   headerVer: Float;
   invalidObjectID: boolean;
+  recommendedObjectID: string;
 begin
   Result := false;
   invalidObjectID := false;
@@ -138,7 +142,7 @@ begin
   AddMessage('Header version:' + FloatToStr(headerVer));
 
   // ヘッダーバージョンに応じて最大レコード数を設定
-  if headerVer < 1.71 then
+  if headerVer < ExtESLVer then
     maxRecordNum := OldESLMaxRecords
   else
     maxRecordNum := NewESLMaxRecords;
@@ -148,6 +152,10 @@ begin
   // レコード数の上限チェック
   if recordNum >= maxRecordNum then begin
     AddMessage('Script aborted: Too many records.');
+    AddMessage('-- Fix Guide --');
+    AddMessage('The script has stopped because the number of records (' + IntToStr(maxRecordNum) + ') is equal to or exceeds the number that the ESL-flagged ESP can hold.');
+    AddMessage('To make space to edit the ESP, temporarily turn off the ESL flag, then set it again after running the script.');
+    AddMessage('If you are familiar with Extended ESL, you may be able to fix this by changing the header version to 1.71.');
     Result := true;
     Exit;
   end;
@@ -159,10 +167,10 @@ begin
   
   // 次に使用される Form ID の取得
   nextObjectID := GetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID');
-  AddMessage('Next Object ID:' + IntToStr(nextObjectID));
+  AddMessage('Next Object ID:' + IntToHex(nextObjectID and $FFFFFF, 1));
   
   // Next Object IDが不正かどうかチェック
-  if headerVer < 1.71 then begin
+  if headerVer < ExtESLVer then begin
     if (nextObjectID < ESLMinFormID) or (nextObjectID > ESLMaxFormID) then
       invalidObjectID := true;
   end
@@ -172,7 +180,15 @@ begin
   end;
 
   if invalidObjectID then begin
+    // 推奨されるForm IDを算出
+    recommendedObjectID := IntToHex((ESLMinFormID + recordNum - NPCrecordNum) and $FFFFFF, 1);
+
     AddMessage('Script aborted: Next Object ID is invalid.');
+    AddMessage('-- Fix Guide --');
+    AddMessage('The script has stopped because the Form ID to be assigned to a newly generated record exceeds the valid range for ESL-flagged ESP.');
+    AddMessage('Edit the Next Object ID value in the file header to an appropriate value.');
+    AddMessage('The expected appropriate value is ' + recommendedObjectID + '. If the NPC record contains records that does not override, subtract their count.');
+    AddMessage('If this value is already in use, set an available minimum value within the range of 800 to FFF (000 to FFF if the header version is 1.71 or higher).');
     Result := true;
     Exit;
   end;
@@ -181,6 +197,10 @@ begin
   AddMessage('Remaining Form IDs:' + IntToStr(ESLMaxFormID - nextObjectID));
   if NPCrecordNum > (ESLMaxFormID - nextObjectID) then begin
     AddMessage('Script aborted: Not enough Form ID space.');
+    AddMessage('-- Fix Guide --');
+    AddMessage('The script stopped because there were not enough Form IDs available to accommodate the number of new records to be created.');
+    AddMessage('If the plugin header version is 1.7, updating to 1.71 will make Form IDs from 000 to 7FF available for use.');
+    AddMessage('If the header version is already 1.71 and you get this error, please remove the ESL flag and make it a normal ESP before running the script.');
     Result := true;
     Exit;
   end;
@@ -191,6 +211,7 @@ function Initialize: integer;
 var
   validInput : boolean;
 begin
+  stopFacegenManipulation   := false;
   slExport            := TStringList.Create;
   testFile            := false;
   isInputProvided     := false;
@@ -362,19 +383,21 @@ begin
   newTexturePath := GetFaceGenPath(replacerFileName, newformID, true, TextureMode);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
-  // 顔ファイルを新しいパスにコピー&リネームまたは移動&リネーム
-  if not ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MeshMode) then begin
-    AddMessage('failed copy FaceGeom file');
-//    if missingFacegeom then
-//    AddMessage('FaceGeom file is missing');
-    end;
+  if not stopFacegenManipulation then begin
+    // 顔ファイルを新しいパスにコピー&リネームまたは移動&リネーム
+    if not ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MeshMode) then begin
+      AddMessage('failed copy FaceGeom file');
+  //    if missingFacegeom then
+  //    AddMessage('FaceGeom file is missing');
+      end;
 
-  if not ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TextureMode) then begin
-    AddMessage('failed copy FaceTint file');
-//    if missingFacetint then
-//    AddMessage('FaceTint file is missing');
-    end;
-    
+    if not ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TextureMode) then begin
+      AddMessage('failed copy FaceTint file');
+  //    if missingFacetint then
+  //    AddMessage('FaceTint file is missing');
+      end;
+  end;
+
   // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する（必要？）
 
   // 出力ファイル用の配列操作
