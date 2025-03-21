@@ -123,7 +123,7 @@ end;
 
 function ESLFlagedPluginTest(f: IwbFile): boolean;
 var
-  recordNum, maxRecordNum, NPCrecordNum, nextObjectID: Cardinal;
+  recordNum, maxRecordNum, NPCrecordNum, overrideRecordNum, nextObjectID: Cardinal;
   headerVer: Float;
   invalidObjectID: boolean;
   recommendedObjectID: string;
@@ -180,15 +180,11 @@ begin
   end;
 
   if invalidObjectID then begin
-    // 推奨されるForm IDを算出
-    recommendedObjectID := IntToHex((ESLMinFormID + recordNum - NPCrecordNum) and $FFFFFF, 1);
 
     AddMessage('Script aborted: Next Object ID is invalid.');
     AddMessage('-- Fix Guide --');
     AddMessage('The script has stopped because the Form ID to be assigned to a newly generated record exceeds the valid range for ESL-flagged ESP.');
-    AddMessage('Edit the Next Object ID value in the file header to an appropriate value.');
-    AddMessage('The expected appropriate value is ' + recommendedObjectID + '. If the NPC record contains records that does not override, add their count.');
-    AddMessage('If this value is already in use, set an available minimum value within the range of 800 to FFF (000 to FFF if the header version is 1.71 or higher).');
+    AddMessage('Right-click to open the menu, select Renumber Form IDs from..., and specify 800 to reset the Form ID.');
     Result := true;
     Exit;
   end;
@@ -199,8 +195,9 @@ begin
     AddMessage('Script aborted: Not enough Form ID space.');
     AddMessage('-- Fix Guide --');
     AddMessage('The script stopped because there were not enough Form IDs available to accommodate the number of new records to be created.');
-    AddMessage('If the plugin header version is 1.7, updating to 1.71 will make Form IDs from 000 to 7FF available for use.');
-    AddMessage('If the header version is already 1.71 and you get this error, please remove the ESL flag and make it a normal ESP before running the script.');
+    AddMessage('This error may be caused by the Next Object ID value in the file header being set incorrectly.');
+    AddMessage('This may be fixed by running Renumber form ID from..., Specify 800 to reset the form ID.');
+    AddMessage('If you still do not have enough Form IDs after resetting them, you will need to remove the ESL flag.');
     Result := true;
     Exit;
   end;
@@ -211,7 +208,7 @@ function Initialize: integer;
 var
   validInput : boolean;
 begin
-  stopFacegenManipulation   := false;
+  stopFacegenManipulation   := false;  // デバッグ用変数
   slExport            := TStringList.Create;
   testFile            := false;
   isInputProvided     := false;
