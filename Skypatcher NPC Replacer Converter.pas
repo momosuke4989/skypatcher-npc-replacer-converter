@@ -13,14 +13,19 @@ const
   ExtESLVer = 1.71;
 
 var
+  // デバッグ用変数
   stopFacegenManipulation:  boolean;
+
+  // iniファイル出力用変数
   slExport: TStringList;
-  prefix, addSemicolon: string;
+
+  // ファイル関連変数
   firstRecordFileName, baseFileName, replacerFileName: string;
-  testFile, useFormID, isInputProvided: boolean;
-  removeFacegen, missingFacegeom, missingFacetint : boolean;
+  testFile: boolean;
 
-
+  // イニシャル処理で設定・使用する変数
+  prefix, addSemicolon: string;
+  useFormID, removeFacegen, removeFacegenMissingRec, isInputProvided: boolean;
 
 function InputValidation(const s: string): Boolean;
 var
@@ -67,15 +72,6 @@ end;
 function ManipulateFaceGenFile(oldPath, newPath: string; removeFlag, Mode: boolean): boolean;
 begin
   Result := false;
-  // 元ファイルが存在するか確認
-  if not FileExists(oldPath) then begin
-    AddMessage('File not found: ' + oldPath);
-    if Mode = MeshMode then
-      missingFacegeom := true
-    else
-      missingFacetint := true;
-    Exit;
-  end;
 
   // 新しいフォルダがなければ作成
   if not DirectoryExists(ExtractFilePath(newPath)) then
@@ -213,6 +209,7 @@ begin
   testFile            := false;
   isInputProvided     := false;
   removeFacegen       := false;
+  removeFacegenMissingRec   := false;
   firstRecordFileName := '';
   baseFileName        := '';
   replacerFileName    := '';
@@ -234,7 +231,11 @@ begin
   // コピー元のFacegenファイルを残すかどうか確認
   if MessageDlg('Do you want to keep the Facegen files in the Replacer Mod? (Yes: Keep, No: Remove)'  + #13#10#13#10 +  'Important: If you choose to remove, the file structure of the Replacer Mod will be changed. If you are not sure what this option does,choose to keep.', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
     removeFacegen := true;
-
+    
+  // Facegenファイルを持たないNPCレコードをコピーするか確認
+  if MessageDlg('Convert NPC records that does not have Facegen files? (Yes: Convert, No: Remove)', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
+    removeFacegenMissingRec := true;
+    
   // プレフィックスを入力
   repeat
     isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z), digits (0-9), and the underscore (_) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
@@ -278,8 +279,8 @@ function Process(e: IInterface): integer;
 var
   replacerFile: IwbFile;
   newRecord:  IInterface;
-  compareStrRslt: Cardinal;
-  ESLFlag:  boolean;
+  recordFlag, compareStrRslt: Cardinal;
+  useTraitsFlag, ESLFlag, missingFacegeom, missingFacetint:  boolean;
   oldformID, newformID, trimedOldformID, trimedNewformID: String; 
   oldEditorID, newEditorID, slBaseID, slReplacerID, wnamID, slSkinID: string;
   oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string;
@@ -345,15 +346,52 @@ begin
     Exit;
   end;
 
-  // Facegenファイルのフラグを初期化
+  // フラグを初期化
   missingFacegeom := false;
   missingFacetint := false;
+  useTraitsFlag := false;
 
-  // コピー元のEditor IDを取得
+  // コピー元のformID,EditorID,顔ファイルのパスを取得
+  oldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
   oldEditorID := GetElementEditValues(e, 'EDID');
 
-  // 新しいEditor IDを作成
-  newEditorID := prefix + '_' + oldEditorID;
+  oldMeshPath := GetFaceGenPath(baseFileName, oldformID, false, MeshMode);
+//    AddMessage('oldMeshPath:' + oldMeshPath);
+  oldTexturePath := GetFaceGenPath(baseFileName, oldformID, false, TextureMode);
+//    AddMessage('oldTexturePath:' + oldTexturePath);
+
+  // Facegenファイルが存在するかチェック
+  if not FileExists(oldMeshPath) then begin
+    AddMessage('File not found: ' + oldMeshPath);
+    missingFacegeom := true
+  end;
+  
+  if not FileExists(oldTexturePath) then begin
+    AddMessage('File not found: ' + oldTexturePath);
+    missingFacetint := true;
+  end;
+
+  // レコードがuse traitsフラグを持っているか確認
+  recordFlag := GetElementNativeValues(ElementBySignature(e, 'ACBS'), 'Template Flags');
+  if (recordFlag and $800) <> 0 then
+    useTraitsFlag := true;
+    
+  // Facegenファイルが存在しない場合の処理
+  if missingFacegeom or missingFacetint then begin
+    if removeFacegenMissingRec then begin
+      AddMessage('Remove record: ' + oldEditorID);
+      Remove(e);
+      Exit;
+    end;
+    if useTraitsFlag then
+      AddMessage('This record uses a template and has the Use Traits flag, so it''s normal that it doesn''t have Facegen files.')
+    else begin
+      AddMessage('This record is expected to have a Facegen files, but no corresponding Facegen files were found. The script will be aborted.');
+      slExport.Clear;
+      Result := -1;
+      Exit;
+    end;
+  end;
 
   // レコードを複製
   newRecord := wbCopyElementToFile(e, GetFile(e), True, True);
@@ -362,76 +400,52 @@ begin
     Exit;
   end;
 
-  // 新しいEditor IDを設定
+  // 新しいEditor IDを作成
+  newEditorID := prefix + '_' + oldEditorID;
+  // コピーしたレコードに新しいEditor IDを設定
   SetElementEditValues(newRecord, 'EDID', newEditorID);
   //AddMessage('Created new record with Editor ID: ' + newEditorID);
 
-  // formID,顔ファイルのパスを取得
-  oldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
+  // 新しいformID,顔ファイルのパスを取得
   newformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
 
-  oldMeshPath := GetFaceGenPath(baseFileName, oldformID, false, MeshMode);
-//    AddMessage('oldMeshPath:' + oldMeshPath);
   newMeshPath := GetFaceGenPath(replacerFileName, newformID, true, MeshMode);
 //    AddMessage('newMeshPath:' + newMeshPath);
-    
-  oldTexturePath := GetFaceGenPath(baseFileName, oldformID, false, TextureMode);
-//    AddMessage('oldTexturePath:' + oldTexturePath);
   newTexturePath := GetFaceGenPath(replacerFileName, newformID, true, TextureMode);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   if not stopFacegenManipulation then begin
     // 顔ファイルを新しいパスにコピー&リネームまたは移動&リネーム
-    if not ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MeshMode) then begin
-      AddMessage('failed copy FaceGeom file');
-  //    if missingFacegeom then
-  //    AddMessage('FaceGeom file is missing');
-      end;
-
-    if not ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TextureMode) then begin
-      AddMessage('failed copy FaceTint file');
-  //    if missingFacetint then
-  //    AddMessage('FaceTint file is missing');
-      end;
+    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MeshMode);
+    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TextureMode);
   end;
 
   // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する（必要？）
 
   // 出力ファイル用の配列操作
-  // Facegenファイルが見つからなかった場合はiniファイルへの追記をスキップ
-  if not missingFacegeom and not missingFacetint then begin
-    if useFormID then begin
-      // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する
-      trimedOldformID := IntToHex(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 1);
-      trimedNewformID := IntToHex(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 1);
-      
-      slBaseID := baseFileName + '|' + trimedOldFormID;
-      slReplacerID := replacerFileName + '|' + trimedNewFormID;
-    end
-    else begin
-      slBaseID := oldEditorID;
-      slReplacerID := newEditorID;
-    end;
-
-    // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映
-    wnamID := IntToHex(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 1);
-//      AddMessage('wnamID is:' + wnamID);
-    if wnamID = '0' then
-      slSkinID := slReplacerID
-    else
-      slSkinID := replacerFileName + '|' + wnamID;
-
-    slExport.Add(';' + GetElementEditValues(e, 'FULL'));
-    slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
-  end else begin
-    AddMessage('Facegen files copy was failed. Skip adding to this record line into Skypatcher ini file.');
-    // テンプレートを利用しているNPCだった場合は正常処理なのでその旨を表示
-    if (GetElementEditValues(e, 'TPLT') <> '') then
-      AddMessage('This NPC record is made from templates. Some NPC records that use templates do not have a Facegen files, so copying may fail, but this is normal.')
-    else
-    // テンプレートを利用していなかった場合は異常処理なのでその旨を表示
-      AddMessage('This NPC record should have Facegen files but not found. There may be a problem with the mod file structure.');
+  if useFormID then begin
+    // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する
+    trimedOldformID := IntToHex(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 1);
+    trimedNewformID := IntToHex(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 1);
+    
+    slBaseID := baseFileName + '|' + trimedOldFormID;
+    slReplacerID := replacerFileName + '|' + trimedNewFormID;
+  end
+  else begin
+    slBaseID := oldEditorID;
+    slReplacerID := newEditorID;
   end;
+
+  // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映
+  wnamID := IntToHex(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 1);
+//      AddMessage('wnamID is:' + wnamID);
+  if wnamID = '0' then
+    slSkinID := slReplacerID
+  else
+    slSkinID := replacerFileName + '|' + wnamID;
+
+  slExport.Add(';' + GetElementEditValues(e, 'FULL'));
+  slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
 
   // コピー元レコードを削除
   Remove(e);
