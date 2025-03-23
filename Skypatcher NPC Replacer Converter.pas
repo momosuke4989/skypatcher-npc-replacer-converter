@@ -4,6 +4,9 @@ interface
 implementation
 uses xEditAPI, SysUtils, StrUtils, Windows;
 const
+  // デバッグ用定数
+  STOPFACEGENMANIPULATION = false;
+
   MeshMode = true;
   TextureMode = false;
   OldESLMaxRecords = 2047;
@@ -13,9 +16,6 @@ const
   ExtESLVer = 1.71;
 
 var
-  // デバッグ用変数
-  stopFacegenManipulation:  boolean;
-
   // iniファイル出力用変数
   slExport: TStringList;
 
@@ -119,10 +119,9 @@ end;
 
 function ESLFlagedPluginTest(f: IwbFile): boolean;
 var
-  recordNum, maxRecordNum, NPCrecordNum, overrideRecordNum, nextObjectID: Cardinal;
+  recordNum, maxRecordNum, NPCrecordNum, nextObjectID: Cardinal;
   headerVer: Float;
   invalidObjectID: boolean;
-  recommendedObjectID: string;
 begin
   Result := false;
   invalidObjectID := false;
@@ -204,7 +203,6 @@ function Initialize: integer;
 var
   validInput : boolean;
 begin
-  stopFacegenManipulation   := false;  // デバッグ用変数
   slExport            := TStringList.Create;
   testFile            := false;
   isInputProvided     := false;
@@ -351,7 +349,7 @@ begin
   missingFacetint := false;
   useTraitsFlag := false;
 
-  // コピー元のformID,EditorID,顔ファイルのパスを取得
+  // コピー元のformID,EditorID,Facegenファイルのパスを取得
   oldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
   oldEditorID := GetElementEditValues(e, 'EDID');
 
@@ -406,7 +404,7 @@ begin
   SetElementEditValues(newRecord, 'EDID', newEditorID);
   //AddMessage('Created new record with Editor ID: ' + newEditorID);
 
-  // 新しいformID,顔ファイルのパスを取得
+  // 新しいformID,Facegenファイルのパスを取得
   newformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
 
   newMeshPath := GetFaceGenPath(replacerFileName, newformID, true, MeshMode);
@@ -414,8 +412,8 @@ begin
   newTexturePath := GetFaceGenPath(replacerFileName, newformID, true, TextureMode);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
-  if not stopFacegenManipulation then begin
-    // 顔ファイルを新しいパスにコピー&リネームまたは移動&リネーム
+  if not STOPFACEGENMANIPULATION then begin
+    // Facegenファイルを新しいパスにコピー&リネームまたは移動&リネーム
     ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MeshMode);
     ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TextureMode);
   end;
