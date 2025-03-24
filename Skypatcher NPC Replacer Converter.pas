@@ -7,13 +7,16 @@ const
   // デバッグ用定数
   STOPFACEGENMANIPULATION = false;
 
-  MeshMode = true;
-  TextureMode = false;
-  OldESLMaxRecords = 2047;
-  NewESLMaxRecords = 4095;
-  ESLMaxFormID = 4095;
-  ESLMinFormID = 2048;
-  ExtESLVer = 1.71;
+  // Facegenファイルの操作用定数
+  MESHMODE = true;
+  TEXTUREMODE = false;
+
+  // ESLフラグ付きespのテストで利用する定数
+  OLDESLMAXRECORDS = 2047;
+  NEWESLMAXRECORDS = 4095;
+  ESLMAXFORMID = 4095;
+  ESLMINFORMID = 2048;
+  EXTESLVER = 1.71;
 
 var
   // iniファイル出力用変数
@@ -57,12 +60,12 @@ End;
 
 function GetFaceGenPath(pluginName, formID: string; isNewPath, Mode: boolean): string;
 begin
-  if Mode = MeshMode then
+  if Mode = MESHMODE then
     if isNewPath = true then
       Result := Format('%sSkypatcher NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
     else
       Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
-  if Mode = TextureMode then
+  if Mode = TEXTUREMODE then
     if isNewPath = true then
       Result := Format('%sSkypatcher NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
     else
@@ -137,10 +140,10 @@ begin
   AddMessage('Header version:' + FloatToStr(headerVer));
 
   // ヘッダーバージョンに応じて最大レコード数を設定
-  if headerVer < ExtESLVer then
-    maxRecordNum := OldESLMaxRecords
+  if headerVer < EXTESLVER then
+    maxRecordNum := OLDESLMAXRECORDS
   else
-    maxRecordNum := NewESLMaxRecords;
+    maxRecordNum := NEWESLMAXRECORDS;
     
   AddMessage('Max Record Count:' + IntToStr(maxRecordNum));
 
@@ -165,17 +168,16 @@ begin
   AddMessage('Next Object ID:' + IntToHex(nextObjectID and $FFFFFF, 1));
   
   // Next Object IDが不正かどうかチェック
-  if headerVer < ExtESLVer then begin
-    if (nextObjectID < ESLMinFormID) or (nextObjectID > ESLMaxFormID) then
+  if headerVer < EXTESLVER then begin
+    if (nextObjectID < ESLMINFORMID) or (nextObjectID > ESLMAXFORMID) then
       invalidObjectID := true;
   end
   else begin
-    if nextObjectID > ESLMaxFormID then
+    if nextObjectID > ESLMAXFORMID then
       invalidObjectID := true;
   end;
 
   if invalidObjectID then begin
-
     AddMessage('Script aborted: Next Object ID is invalid.');
     AddMessage('-- Fix Guide --');
     AddMessage('The script has stopped because the Form ID to be assigned to a newly generated record exceeds the valid range for ESL-flagged ESP.');
@@ -185,8 +187,8 @@ begin
   end;
 
   // 残りの Form ID 数を計算し、足りるかチェック
-  AddMessage('Remaining Form IDs:' + IntToStr(ESLMaxFormID - nextObjectID));
-  if NPCrecordNum > (ESLMaxFormID - nextObjectID) then begin
+  AddMessage('Remaining Form IDs:' + IntToStr(ESLMAXFORMID - nextObjectID));
+  if NPCrecordNum > (ESLMAXFORMID - nextObjectID) then begin
     AddMessage('Script aborted: Not enough Form ID space.');
     AddMessage('-- Fix Guide --');
     AddMessage('The script stopped because there were not enough Form IDs available to accommodate the number of new records to be created.');
@@ -278,10 +280,10 @@ var
   replacerFile: IwbFile;
   newRecord:  IInterface;
   recordFlag, compareStrRslt: Cardinal;
-  useTraitsFlag, ESLFlag, missingFacegeom, missingFacetint:  boolean;
-  oldformID, newformID, trimedOldformID, trimedNewformID: String; 
-  oldEditorID, newEditorID, slBaseID, slReplacerID, wnamID, slSkinID: string;
-  oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string;
+  ESLFlag, useTraitsFlag, missingFacegeom, missingFacetint: boolean;
+  oldFormID, newFormID, oldEditorID, newEditorID, recordID: string; // レコードID関連
+  oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // Facegenファイルのパス格納用
+  trimedOldFormID, trimedNewFormID, slBaseID, slReplacerID, wnamID, slSkinID: string; // Skypatcher iniファイルの記入用
 begin
   // 選択中のプラグインを検証、最初のレコードのみ実行する
   if testFile = false then begin
@@ -349,13 +351,13 @@ begin
   missingFacetint := false;
   useTraitsFlag := false;
 
-  // コピー元のformID,EditorID,Facegenファイルのパスを取得
-  oldformID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
+  // コピー元のFormID,EditorID,Facegenファイルのパスを取得
+  oldFormID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
   oldEditorID := GetElementEditValues(e, 'EDID');
 
-  oldMeshPath := GetFaceGenPath(baseFileName, oldformID, false, MeshMode);
+  oldMeshPath := GetFaceGenPath(baseFileName, oldFormID, false, MESHMODE);
 //    AddMessage('oldMeshPath:' + oldMeshPath);
-  oldTexturePath := GetFaceGenPath(baseFileName, oldformID, false, TextureMode);
+  oldTexturePath := GetFaceGenPath(baseFileName, oldFormID, false, TEXTUREMODE);
 //    AddMessage('oldTexturePath:' + oldTexturePath);
 
   // Facegenファイルが存在するかチェック
@@ -373,18 +375,38 @@ begin
   recordFlag := GetElementNativeValues(ElementBySignature(e, 'ACBS'), 'Template Flags');
   if (recordFlag and $800) <> 0 then
     useTraitsFlag := true;
-    
+  
+  // レコードIDを変数に格納
+  recordID := 'Form ID: ' + oldFormID + ', Editor ID: ' + oldEditorID;
   // Facegenファイルが存在しない場合の処理
-  if missingFacegeom or missingFacetint then begin
+  // FaceGeomかFaceTintのどちらか片方が存在していない場合
+  if (missingFacegeom and not missingFacetint) or (not missingFacegeom and missingFacetint) then begin
+    if missingFacegeom then
+      AddMessage('FaceGeom file associated with this record is missing.')
+    else
+      AddMessage('FaceTint file associated with this record is missing.');
+    
+    AddMessage(recordID);
+    AddMessage('The script will be aborted.');
+    slExport.Clear;
+    Result := -1;
+    Exit;    
+  end
+  // 両方のファイルが存在していない場合
+  else if missingFacegeom and missingFacetint then begin
+    AddMessage('Neither a FaceGeom file nor a FaceTint file exists associated with this record.');
+    // ユーザオプションに基づいてレコードを削除するか判断、削除したら次のレコードの処理へ移行
     if removeFacegenMissingRec then begin
-      AddMessage('Remove record: ' + oldEditorID);
+      AddMessage('Remove this record based on the user''s options. ' + recordID);
       Remove(e);
       Exit;
     end;
+    // Use Traitsフラグを持っていない場合は異常と判断してスクリプトを中断する
     if useTraitsFlag then
-      AddMessage('This record uses a template and has the Use Traits flag, so it''s normal that it doesn''t have Facegen files.')
+      AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have Facegen files.')
     else begin
-      AddMessage('This record is expected to have a Facegen files, but no corresponding Facegen files were found. The script will be aborted.');
+      AddMessage('This record (' + recordID + ') is expected to have a Facegen files, but no associated with Facegen files were found.');
+      AddMessage('The script will be aborted.');
       slExport.Clear;
       Result := -1;
       Exit;
@@ -398,52 +420,56 @@ begin
     Exit;
   end;
 
-  // 新しいEditor IDを作成
+  // 新しいForm ID, Editor IDを作成し,コピーしたレコードに新しいEditor IDを設定
+  newFormID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
+  // AddMessage('New record Form ID: ' + newFormID);
   newEditorID := prefix + '_' + oldEditorID;
-  // コピーしたレコードに新しいEditor IDを設定
   SetElementEditValues(newRecord, 'EDID', newEditorID);
-  //AddMessage('Created new record with Editor ID: ' + newEditorID);
-
-  // 新しいformID,Facegenファイルのパスを取得
-  newformID := IntToHex64(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 8);
-
-  newMeshPath := GetFaceGenPath(replacerFileName, newformID, true, MeshMode);
+  // AddMessage('Created new record with Editor ID: ' + newEditorID);
+  
+  // 新しいFacegenファイルのパスを取得
+  newMeshPath := GetFaceGenPath(replacerFileName, newFormID, true, MESHMODE);
 //    AddMessage('newMeshPath:' + newMeshPath);
-  newTexturePath := GetFaceGenPath(replacerFileName, newformID, true, TextureMode);
+  newTexturePath := GetFaceGenPath(replacerFileName, newFormID, true, TEXTUREMODE);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   if not STOPFACEGENMANIPULATION then begin
     // Facegenファイルを新しいパスにコピー&リネームまたは移動&リネーム
-    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MeshMode);
-    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TextureMode);
+    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MESHMODE);
+    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TEXTUREMODE);
   end;
 
-  // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する（必要？）
+  // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する(必要？)
 
   // 出力ファイル用の配列操作
-  if useFormID then begin
-    // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する
-    trimedOldformID := IntToHex(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 1);
-    trimedNewformID := IntToHex(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 1);
-    
-    slBaseID := baseFileName + '|' + trimedOldFormID;
-    slReplacerID := replacerFileName + '|' + trimedNewFormID;
-  end
+  // Use Traitsフラグを持っているNPCレコードはiniファイルへの追記をスキップする
+  if useTraitsFlag then
+    AddMessage('Since this record has the Use Traits flag, it will be skipped from being added to the Skypatcher ini file.')
   else begin
-    slBaseID := oldEditorID;
-    slReplacerID := newEditorID;
+    if useFormID then begin
+      // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する
+      trimedOldFormID := IntToHex(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 1);
+      trimedNewFormID := IntToHex(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 1);
+      
+      slBaseID := baseFileName + '|' + trimedOldFormID;
+      slReplacerID := replacerFileName + '|' + trimedNewFormID;
+    end
+    else begin
+      slBaseID := oldEditorID;
+      slReplacerID := newEditorID;
+    end;
+
+    // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映
+    wnamID := IntToHex(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 1);
+    //  AddMessage('wnamID is:' + wnamID);
+    if wnamID = '0' then
+      slSkinID := slReplacerID
+    else
+      slSkinID := replacerFileName + '|' + wnamID;
+
+    slExport.Add(';' + GetElementEditValues(e, 'FULL'));
+    slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
   end;
-
-  // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映
-  wnamID := IntToHex(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 1);
-//      AddMessage('wnamID is:' + wnamID);
-  if wnamID = '0' then
-    slSkinID := slReplacerID
-  else
-    slSkinID := replacerFileName + '|' + wnamID;
-
-  slExport.Add(';' + GetElementEditValues(e, 'FULL'));
-  slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
 
   // コピー元レコードを削除
   Remove(e);
