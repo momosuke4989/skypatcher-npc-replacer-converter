@@ -14,8 +14,8 @@ const
   // ESLフラグ付きespのテストで利用する定数
   OLDESLMAXRECORDS = 2047;
   NEWESLMAXRECORDS = 4095;
-  ESLMAXFORMID = 4095;
-  ESLMINFORMID = 2048;
+  ESLMAXFORMID = $FFF;
+  ESLMINFORMID = $800;
   EXTESLVER = 1.71;
 
 var
@@ -62,12 +62,12 @@ function GetFaceGenPath(pluginName, formID: string; isNewPath, Mode: boolean): s
 begin
   if Mode = MESHMODE then
     if isNewPath = true then
-      Result := Format('%sSkypatcher NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
+      Result := Format('%sSkyPatcher NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
     else
       Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
   if Mode = TEXTUREMODE then
     if isNewPath = true then
-      Result := Format('%sSkypatcher NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
+      Result := Format('%sSkyPatcher NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
     else
       Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
@@ -283,7 +283,7 @@ var
   ESLFlag, useTraitsFlag, missingFacegeom, missingFacetint: boolean;
   oldFormID, newFormID, oldEditorID, newEditorID, recordID: string; // レコードID関連
   oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // Facegenファイルのパス格納用
-  trimedOldFormID, trimedNewFormID, slBaseID, slReplacerID, wnamID, slSkinID: string; // Skypatcher iniファイルの記入用
+  trimedOldFormID, trimedNewFormID, slBaseID, slReplacerID, wnamID, slSkinID: string; // SkyPatcher iniファイルの記入用
 begin
   // 選択中のプラグインを検証、最初のレコードのみ実行する
   if testFile = false then begin
@@ -373,7 +373,7 @@ begin
 
   // レコードがuse traitsフラグを持っているか確認
   recordFlag := GetElementNativeValues(ElementBySignature(e, 'ACBS'), 'Template Flags');
-  if (recordFlag and $800) <> 0 then
+  if (recordFlag and $01) <> 0 then
     useTraitsFlag := true;
   
   // レコードIDを変数に格納
@@ -444,7 +444,7 @@ begin
   // 出力ファイル用の配列操作
   // Use Traitsフラグを持っているNPCレコードはiniファイルへの追記をスキップする
   if useTraitsFlag then
-    AddMessage('Since this record has the Use Traits flag, it will be skipped from being added to the Skypatcher ini file.')
+    AddMessage('Since this record has the Use Traits flag, it will be skipped from being added to the SkyPatcher ini file.')
   else begin
     if useFormID then begin
       // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する
@@ -483,8 +483,8 @@ var
 begin
   if slExport.Count <> 0 then 
   begin
-  // Skypatcher iniファイルの出力処理
-  saveDir := DataPath + 'Skypatcher NPC Replacer Converter\SKSE\Plugins\Skypatcher\npc\Skypatcher NPC Replacer Converter\';
+  // SkyPatcher iniファイルの出力処理
+  saveDir := DataPath + 'SkyPatcher NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher NPC Replacer Converter\';
   if not DirectoryExists(saveDir) then
     ForceDirectories(saveDir);
 
