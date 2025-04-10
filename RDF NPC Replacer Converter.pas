@@ -451,8 +451,8 @@ begin
       trimedOldFormID := IntToHex(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 1);
       trimedNewFormID := IntToHex(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 1);
       
-      slBaseID := baseFileName + '|' + trimedOldFormID;
-      slReplacerID := replacerFileName + '|' + trimedNewFormID;
+      slBaseID := trimedOldFormID + '~' + baseFileName;
+      slReplacerID := trimedNewFormID + '~' + replacerFileName;
     end
     else begin
       slBaseID := oldEditorID;
@@ -465,7 +465,7 @@ begin
     if wnamID = '0' then
       slSkinID := slReplacerID
     else
-      slSkinID := replacerFileName + '|' + wnamID;
+      slSkinID := wnamID + '~' + replacerFileName;
 
     slExport.Add('#' + GetElementEditValues(e, 'FULL'));
     slExport.Add(commentOut + 'match=' + slBaseID + ' swap=' + slReplacerID + #13#10);
