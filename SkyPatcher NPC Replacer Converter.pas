@@ -3,6 +3,8 @@ unit UserScript;
 interface
 implementation
 uses xEditAPI, SysUtils, StrUtils, Windows;
+uses 'Forms','Controls','StdCtrls','CheckLst','Dialogs';
+
 const
   // デバッグ用定数
   STOPFACEGENMANIPULATION = false;
@@ -27,8 +29,67 @@ var
   testFile: boolean;
 
   // イニシャル処理で設定・使用する変数
-  prefix, addSemicolon: string;
+  prefix, commentOut: string;
   useFormID, removeFacegen, removeFacegenMissingRec, isInputProvided: boolean;
+
+function ShowCheckboxForm(const options: TStringList; out selected: TStringList): Boolean;
+var
+  form: TForm;
+  checklist: TCheckListBox;
+  btnOK, btnCancel: TButton;
+  i: Integer;
+begin
+  Result := False;
+
+  form := TForm.Create(nil);
+  try
+    form.Caption := 'Select Options';
+    form.Width := 350;
+    form.Height := 300;
+    form.Position := poScreenCenter;
+
+    checklist := TCheckListBox.Create(form);
+    checklist.Parent := form;
+    checklist.Align := alTop;
+    checklist.Height := 200;
+
+    // 選択肢を追加
+    for i := 0 to options.Count - 1 do begin
+      checklist.Items.Add(options[i]);
+    end;
+
+    btnOK := TButton.Create(form);
+    btnOK.Parent := form;
+    btnOK.Caption := 'OK';
+    btnOK.ModalResult := mrOk;
+    btnOK.Width := 75;
+    btnOK.Top := checklist.Top + checklist.Height + 10;
+    btnOK.Left := (form.ClientWidth div 2) - btnOK.Width - 10;
+
+    btnCancel := TButton.Create(form);
+    btnCancel.Parent := form;
+    btnCancel.Caption := 'Cancel';
+    btnCancel.ModalResult := mrCancel;
+    btnCancel.Width := 75;
+    btnCancel.Top := btnOK.Top;
+    btnCancel.Left := (form.ClientWidth div 2) + 10;
+
+    form.BorderStyle := bsDialog;
+    form.Position := poScreenCenter;
+
+    if form.ShowModal = mrOk then
+    begin
+      Result := True;
+      for i := 0 to checklist.Items.Count - 1 do
+        if checklist.Checked[i] then
+          selected.Add('True')
+        else
+          selected.Add('False');
+    end;
+  finally
+    form.Free;
+  end;
+end;
 
 function InputValidation(const s: string): Boolean;
 var
@@ -204,38 +265,70 @@ end;
 function Initialize: integer;
 var
   validInput : boolean;
+  opts, selected: TStringList;
+  i: Integer;
 begin
   slExport            := TStringList.Create;
   testFile            := false;
-  isInputProvided     := false;
-  removeFacegen       := false;
-  removeFacegenMissingRec   := false;
+
   firstRecordFileName := '';
   baseFileName        := '';
   replacerFileName    := '';
-  addSemicolon        := '';
-  Result              := 0;
+
   
+  commentOut          := '';
+  useFormID           := false;
+  removeFacegen       := false;
+  removeFacegenMissingRec   := false;
+  isInputProvided     := false;
   validInput          := false;
+  
+  opts                := TStringList.Create;
+  selected            := TStringList.Create;
+  
+  Result              := 0;
 
-  // 出力ファイルに使うのはFormIDとEditorIDのどちらか確認
-  if MessageDlg('Use Editor ID for output? (Yes: Editor ID, No: Form ID)', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
-    useFormID := true
-  else
-    useFormID := false;
+  // 各オプションの設定
+  try
+    opts.Add('Use Form ID for config file output');
+    opts.Add('Disable the config file by default');
+    opts.Add('Remove Facegen files in the replacer mod');
+    opts.Add('Remove NPC records without Facegen files');
 
-  // 出力ファイルのデフォルト設定をすべて有効にするか確認
-  if MessageDlg('Enable output ini file by default? (Yes: Enable, No: Disable)', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
-    addSemicolon := ';';
-
-  // コピー元のFacegenファイルを残すかどうか確認
-  if MessageDlg('Do you want to keep the Facegen files in the Replacer Mod? (Yes: Keep, No: Remove)'  + #13#10#13#10 +  'Important: If you choose to remove, the file structure of the Replacer Mod will be changed. If you are not sure what this option does,choose to keep.', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
-    removeFacegen := true;
+    if ShowCheckboxForm(opts, selected) then
+    begin
+      AddMessage('You selected:');
+      for i := 0 to selected.Count - 1 do
+        AddMessage(opts[i] + ' - ' + selected[i]);
+    end
+    else begin
+      AddMessage('Selection was canceled.');
+      Result := -1;
+      Exit;
+    end;
     
-  // Facegenファイルを持たないNPCレコードをコピーするか確認
-  if MessageDlg('Convert NPC records that does not have Facegen files? (Yes: Convert, No: Remove)', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
-    removeFacegenMissingRec := true;
-    
+
+    // 出力ファイルに使うのはFormIDとEditorIDのどちらか
+    if selected[0] = 'True' then
+      useFormID := true;
+      
+    // 出力ファイルのデフォルト設定をすべて有効にするか確認
+    if selected[1] = 'True' then
+      commentOut := '#';
+      
+    // コピー元のFacegenファイルを残すか
+    if selected[2] = 'True' then
+      removeFacegen := true;
+      
+    // Facegenファイルを持たないNPCレコードをコピーするか
+    if selected[3] = 'True' then
+      removeFacegenMissingRec := true;
+      
+  finally
+    opts.Free;
+    selected.Free;
+  end;
+
   // プレフィックスを入力
   repeat
     isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z), digits (0-9), and the underscore (_) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
