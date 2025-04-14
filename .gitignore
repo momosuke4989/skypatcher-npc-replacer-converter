@@ -43,4 +43,5 @@ samples/
 # My settings #
 ###############
 *.lnk
+*.bak
 *.WinMerge

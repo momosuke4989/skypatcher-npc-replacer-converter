@@ -183,7 +183,7 @@ end;
 
 function ESLFlagedPluginTest(f: IwbFile): boolean;
 var
-  recordNum, maxRecordNum, NPCrecordNum, nextObjectID, numUsedFormID, estRemainingFormID: Cardinal;
+  recordNum, maxRecordNum, NPCrecordNum, nextObjectID, numUsedFormID: Cardinal;
   headerVer: Float;
   invalidObjectID: boolean;
 begin
@@ -207,47 +207,47 @@ begin
   NPCrecordNum := GetNPCRecordCount(f);
   AddMessage('NPC Records:' + IntToStr(NPCrecordNum));
   
-  // ヘッダーバージョンに応じて変化する値の設定
+  // ヘッダーバージョンに応じて変化する設定、判定
+  // Next Object IDが範囲内かどうかチェック
   if headerVer < EXTESLVER then begin
     // レコード最大数を設定
     maxRecordNum := OLDESLMAXRECORDS;
+    // Next Object IDが範囲を超えていないか判定
+    if (nextObjectID < ESLSTARTFORMID) or (nextObjectID > ESLMAXFORMID) then
+      invalidObjectID := true;
     // 使用済みForm IDの数を設定
-    if (nextObjectID >= ESLSTARTFORMID) and (nextObjectID <= ESLMAXFORMID) then
-      numUsedFormID := nextObjectID - ESLSTARTFORMID
-    else 
-      numUsedFormID := nextObjectID;
+    if nextObjectID >= ESLSTARTFORMID then
+      numUsedFormID := nextObjectID - ESLSTARTFORMID;
   end
   else begin
     // レコード最大数を設定
     maxRecordNum := NEWESLMAXRECORDS;
+    // Next Object IDが範囲を超えていないか判定
+    if nextObjectID > ESLMAXFORMID then
+      invalidObjectID := true;
     // 使用済みForm IDの数を設定
     if nextObjectID < ESLSTARTFORMID then
       numUsedFormID := nextObjectID + ESLSTARTFORMID
-    else if (nextObjectID >= ESLSTARTFORMID) and (nextObjectID <= ESLMAXFORMID) then
-      numUsedFormID := nextObjectID - ESLSTARTFORMID
     else
-      numUsedFormID := nextObjectID;
-  end;
-  
-  AddMessage('Max Record Count:' + IntToStr(maxRecordNum));
-  
-  // 利用可能なForm ID数の予想値を計算
-  estRemainingFormID := maxRecordNum - numUsedFormID;
-  AddMessage('Estimate Remaining Form IDs:' + IntToStr(estRemainingFormID));
-  
-  // Next Object IDが制限範囲を超えていないか判定
-  if headerVer < EXTESLVER then begin
-    if (nextObjectID < ESLSTARTFORMID) or (nextObjectID > ESLMAXFORMID) then
-      invalidObjectID := true;
-  end
-  else begin
-    if nextObjectID > ESLMAXFORMID then
-      invalidObjectID := true;
+      numUsedFormID := nextObjectID - ESLSTARTFORMID;
   end;
     
-
+  AddMessage('Max Record Count:' + IntToStr(maxRecordNum));
+  AddMessage('Remaining Form IDs:' + IntToStr(maxRecordNum - numUsedFormID));
 
   // Form IDの判定
+  // Form IDの空きスペースが足りない
+  if NPCrecordNum > (maxRecordNum - numUsedFormID) then begin
+    AddMessage('Script aborted: Not enough Form ID space.');
+    if MessageDlg('Not enough Form IDs available. Do you want to reset the Next Object ID?', mtConfirmation, [mbOK, mbCancel], 0) = mrOK then begin
+      SetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID', $800);
+      AddMessage('Reset Next Object ID to 800');
+      MessageDlg('The Next Object ID has been reset to 800. Check the HEDR field in the File Header and rerun the script.', mtConfirmation, [mbOK], 0);
+    end;
+    Result := true;
+    Exit;
+  end;
+
   // Next Object IDが範囲外
   if invalidObjectID then begin
     AddMessage('Script aborted: Next Object ID is invalid.');
@@ -259,19 +259,7 @@ begin
     Result := true;
     Exit;
   end;
-  
-  // Form IDの空きスペースが足りない
-  if (estRemainingFormID > 0) and (NPCrecordNum > estRemainingFormID) then begin
-    AddMessage('Script aborted: Not enough Form ID space.');
-    if MessageDlg('Not enough Form IDs available. Do you want to reset the Next Object ID?', mtConfirmation, [mbOK, mbCancel], 0) = mrOK then begin
-      SetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID', $800);
-      AddMessage('Reset Next Object ID to 800');
-      MessageDlg('The Next Object ID has been reset to 800. Check the HEDR field in the File Header and rerun the script.', mtConfirmation, [mbOK], 0);
-    end;
-    Result := true;
-    Exit;
-  end;
-  
+
   // レコード数が上限以上
   if recordNum >= maxRecordNum then begin
     AddMessage('Script aborted: Too many records.');

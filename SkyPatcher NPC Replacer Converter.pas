@@ -17,7 +17,7 @@ const
   OLDESLMAXRECORDS = 2047;
   NEWESLMAXRECORDS = 4095;
   ESLMAXFORMID = $FFF;
-  ESLMINFORMID = $800;
+  ESLSTARTFORMID = $800;
   EXTESLVER = 1.71;
 
 var
@@ -183,7 +183,7 @@ end;
 
 function ESLFlagedPluginTest(f: IwbFile): boolean;
 var
-  recordNum, maxRecordNum, NPCrecordNum, nextObjectID: Cardinal;
+  recordNum, maxRecordNum, NPCrecordNum, nextObjectID, numUsedFormID, estRemainingFormID: Cardinal;
   headerVer: Float;
   invalidObjectID: boolean;
 begin
@@ -192,7 +192,6 @@ begin
 
   AddMessage('Checking ESL Plugin: ' + GetFileName(f));
 
-  // レコード数上限チェック
   // レコード数の取得
   recordNum := RecordCount(f);
   AddMessage('Total Records:' + IntToStr(recordNum));
@@ -200,62 +199,86 @@ begin
   headerVer := GetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Version');
   AddMessage('Header version:' + FloatToStr(headerVer));
 
-  // ヘッダーバージョンに応じて最大レコード数を設定
-  if headerVer < EXTESLVER then
-    maxRecordNum := OLDESLMAXRECORDS
-  else
-    maxRecordNum := NEWESLMAXRECORDS;
-    
-  AddMessage('Max Record Count:' + IntToStr(maxRecordNum));
-
-  // レコード数の上限チェック
-  if recordNum >= maxRecordNum then begin
-    AddMessage('Script aborted: Too many records.');
-    AddMessage('-- Fix Guide --');
-    AddMessage('The script has stopped because the number of records (' + IntToStr(maxRecordNum) + ') is equal to or exceeds the number that the ESL-flagged ESP can hold.');
-    AddMessage('To make space to edit the ESP, temporarily turn off the ESL flag, then set it again after running the script.');
-    AddMessage('If you are familiar with Extended ESL, you may be able to fix this by changing the header version to 1.71.');
-    Result := true;
-    Exit;
-  end;
-
-  // Form IDの上限チェック
-  // NPCレコードの数を取得
-  NPCrecordNum := GetNPCRecordCount(f);
-  AddMessage('NPC Records:' + IntToStr(NPCrecordNum));
-  
   // 次に使用される Form ID の取得
   nextObjectID := GetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID');
   AddMessage('Next Object ID:' + IntToHex(nextObjectID and $FFFFFF, 1));
   
-  // Next Object IDが不正かどうかチェック
+  // NPCレコードの数を取得
+  NPCrecordNum := GetNPCRecordCount(f);
+  AddMessage('NPC Records:' + IntToStr(NPCrecordNum));
+  
+  // ヘッダーバージョンに応じて変化する値の設定
   if headerVer < EXTESLVER then begin
-    if (nextObjectID < ESLMINFORMID) or (nextObjectID > ESLMAXFORMID) then
+    // レコード最大数を設定
+    maxRecordNum := OLDESLMAXRECORDS;
+    // 使用済みForm IDの数を設定
+    if (nextObjectID >= ESLSTARTFORMID) and (nextObjectID <= ESLMAXFORMID) then
+      numUsedFormID := nextObjectID - ESLSTARTFORMID
+    else 
+      numUsedFormID := nextObjectID;
+  end
+  else begin
+    // レコード最大数を設定
+    maxRecordNum := NEWESLMAXRECORDS;
+    // 使用済みForm IDの数を設定
+    if nextObjectID < ESLSTARTFORMID then
+      numUsedFormID := nextObjectID + ESLSTARTFORMID
+    else if (nextObjectID >= ESLSTARTFORMID) and (nextObjectID <= ESLMAXFORMID) then
+      numUsedFormID := nextObjectID - ESLSTARTFORMID
+    else
+      numUsedFormID := nextObjectID;
+  end;
+  
+  AddMessage('Max Record Count:' + IntToStr(maxRecordNum));
+  
+  // 利用可能なForm ID数の予想値を計算
+  estRemainingFormID := maxRecordNum - numUsedFormID;
+  AddMessage('Estimate Remaining Form IDs:' + IntToStr(estRemainingFormID));
+  
+  // Next Object IDが制限範囲を超えていないか判定
+  if headerVer < EXTESLVER then begin
+    if (nextObjectID < ESLSTARTFORMID) or (nextObjectID > ESLMAXFORMID) then
       invalidObjectID := true;
   end
   else begin
     if nextObjectID > ESLMAXFORMID then
       invalidObjectID := true;
   end;
+    
 
+
+  // Form IDの判定
+  // Next Object IDが範囲外
   if invalidObjectID then begin
     AddMessage('Script aborted: Next Object ID is invalid.');
-    AddMessage('-- Fix Guide --');
-    AddMessage('The script has stopped because the Form ID to be assigned to a newly generated record exceeds the valid range for ESL-flagged ESP.');
-    AddMessage('Right-click to open the menu, select Renumber Form IDs from..., and specify 800 to reset the Form ID.');
+    if MessageDlg('Next Object ID is invalid. Do you want to reset the Next Object ID?', mtConfirmation, [mbOK, mbCancel], 0) = mrOK then begin
+      SetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID', $800);
+      AddMessage('Reset Next Object ID to 800');
+      MessageDlg('The Next Object ID has been reset to 800. Check the HEDR field in the File Header and rerun the script.', mtConfirmation, [mbOK], 0);
+    end;
     Result := true;
     Exit;
   end;
-
-  // 残りの Form ID 数を計算し、足りるかチェック
-  AddMessage('Remaining Form IDs:' + IntToStr(ESLMAXFORMID - nextObjectID));
-  if NPCrecordNum > (ESLMAXFORMID - nextObjectID) then begin
+  
+  // Form IDの空きスペースが足りない
+  if (estRemainingFormID > 0) and (NPCrecordNum > estRemainingFormID) then begin
     AddMessage('Script aborted: Not enough Form ID space.');
+    if MessageDlg('Not enough Form IDs available. Do you want to reset the Next Object ID?', mtConfirmation, [mbOK, mbCancel], 0) = mrOK then begin
+      SetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID', $800);
+      AddMessage('Reset Next Object ID to 800');
+      MessageDlg('The Next Object ID has been reset to 800. Check the HEDR field in the File Header and rerun the script.', mtConfirmation, [mbOK], 0);
+    end;
+    Result := true;
+    Exit;
+  end;
+  
+  // レコード数が上限以上
+  if recordNum >= maxRecordNum then begin
+    AddMessage('Script aborted: Too many records.');
     AddMessage('-- Fix Guide --');
-    AddMessage('The script stopped because there were not enough Form IDs available to accommodate the number of new records to be created.');
-    AddMessage('This error may be caused by the Next Object ID value in the file header being set incorrectly.');
-    AddMessage('This may be fixed by running Renumber form ID from..., Specify 800 to reset the form ID.');
-    AddMessage('If you still do not have enough Form IDs after resetting them, you will need to remove the ESL flag.');
+    AddMessage('The script has stopped because the number of records (' + IntToStr(maxRecordNum) + ') is equal to or exceeds the number that the ESL-flagged ESP can hold.');
+    AddMessage('To make space to edit the ESP, temporarily turn off the ESL flag, then set it again after running the script.');
+    AddMessage('If you are familiar with Extended ESL, you may be able to fix this by changing the header version to 1.71.');
     Result := true;
     Exit;
   end;
@@ -561,7 +584,7 @@ begin
       slSkinID := replacerFileName + '|' + wnamID;
 
     slExport.Add(';' + GetElementEditValues(e, 'FULL'));
-    slExport.Add(addSemicolon + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
+    slExport.Add(commentOut + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
   end;
 
   // コピー元レコードを削除
