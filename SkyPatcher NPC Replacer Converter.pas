@@ -1,7 +1,5 @@
 unit UserScript;
 
-interface
-implementation
 uses xEditAPI, SysUtils, StrUtils, Windows;
 uses 'Forms','Controls','StdCtrls','CheckLst','Dialogs';
 
@@ -113,27 +111,27 @@ end;
 
 function IsMasterAEPlugin(plugin: IInterface): Boolean;
 var
-  PluginName  : String;
+  pluginName  : String;
 Begin
-  PluginName := GetFileName(plugin);
-  Result := (CompareStr(PluginName, 'Skyrim.esm') = 0) or (CompareStr(PluginName, 'Update.esm') = 0) or (CompareStr(PluginName, 'Dawnguard.esm') = 0) or (CompareStr(PluginName, 'HearthFires.esm') = 0) or (CompareStr(PluginName, 'Dragonborn.esm') = 0) or (CompareStr(PluginName, 'ccBGSSSE001-Fish.esm') = 0) or (CompareStr(PluginName, 'ccQDRSSE001-SurvivalMode.esl') = 0) or (CompareStr(PluginName, 'ccBGSSSE037-Curios.esl') = 0) or (CompareStr(PluginName, 'ccBGSSSE025-AdvDSGS.esm') = 0) or (CompareStr(PluginName, '_ResourcePack.esl') = 0);
+  pluginName := GetFileName(plugin);
+  Result := (CompareStr(pluginName, 'Skyrim.esm') = 0) or (CompareStr(pluginName, 'Update.esm') = 0) or (CompareStr(pluginName, 'Dawnguard.esm') = 0) or (CompareStr(pluginName, 'HearthFires.esm') = 0) or (CompareStr(pluginName, 'Dragonborn.esm') = 0) or (CompareStr(pluginName, 'ccBGSSSE001-Fish.esm') = 0) or (CompareStr(pluginName, 'ccQDRSSE001-SurvivalMode.esl') = 0) or (CompareStr(pluginName, 'ccBGSSSE037-Curios.esl') = 0) or (CompareStr(pluginName, 'ccBGSSSE025-AdvDSGS.esm') = 0) or (CompareStr(pluginName, '_ResourcePack.esl') = 0);
 End;
 
-function GetFaceGenPath(pluginName, formID: string; isNewPath, Mode: boolean): string;
+function GetFaceGenPath(pluginName, formID: string; isNewPath, mode: boolean): string;
 begin
-  if Mode = MESHMODE then
+  if mode = MESHMODE then
     if isNewPath = true then
       Result := Format('%sSkyPatcher NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
     else
       Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
-  if Mode = TEXTUREMODE then
+  if mode = TEXTUREMODE then
     if isNewPath = true then
       Result := Format('%sSkyPatcher NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
     else
       Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
 
-function ManipulateFaceGenFile(oldPath, newPath: string; removeFlag, Mode: boolean): boolean;
+function ManipulateFaceGenFile(oldPath, newPath: string; removeFlag: boolean): boolean;
 begin
   Result := false;
 
@@ -183,7 +181,7 @@ end;
 
 function ESLFlagedPluginTest(f: IwbFile): boolean;
 var
-  recordNum, maxRecordNum, NPCrecordNum, nextObjectID, numUsedFormID, estRemainingFormID: Cardinal;
+  recordNum, maxRecordNum, npcRecordNum, nextObjectID, numUsedFormID, estRemainingFormID: Cardinal;
   headerVer: Float;
   invalidObjectID: boolean;
 begin
@@ -204,8 +202,8 @@ begin
   AddMessage('Next Object ID:' + IntToHex(nextObjectID and $FFFFFF, 1));
   
   // NPCレコードの数を取得
-  NPCrecordNum := GetNPCRecordCount(f);
-  AddMessage('NPC Records:' + IntToStr(NPCrecordNum));
+  npcRecordNum := GetNPCRecordCount(f);
+  AddMessage('NPC Records:' + IntToStr(npcRecordNum));
   
   // ヘッダーバージョンに応じて変化する値の設定
   if headerVer < EXTESLVER then begin
@@ -261,7 +259,7 @@ begin
   end;
   
   // Form IDの空きスペースが足りない
-  if (estRemainingFormID > 0) and (NPCrecordNum > estRemainingFormID) then begin
+  if (estRemainingFormID > 0) and (npcRecordNum > estRemainingFormID) then begin
     AddMessage('Script aborted: Not enough Form ID space.');
     if MessageDlg('Not enough Form IDs available. Do you want to reset the Next Object ID?', mtConfirmation, [mbOK, mbCancel], 0) = mrOK then begin
       SetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID', $800);
@@ -337,7 +335,7 @@ begin
       
     // 出力ファイルのデフォルト設定をすべて有効にするか確認
     if selected[1] = 'True' then
-      commentOut := '#';
+      commentOut := ';';
       
     // コピー元のFacegenファイルを残すか
     if selected[2] = 'True' then
@@ -396,7 +394,7 @@ var
   replacerFile: IwbFile;
   newRecord:  IInterface;
   recordFlag, compareStrRslt: Cardinal;
-  ESLFlag, useTraitsFlag, missingFacegeom, missingFacetint: boolean;
+  eslFlag, useTraitsFlag, missingFacegeom, missingFacetint: boolean;
   oldFormID, newFormID, oldEditorID, newEditorID, recordID: string; // レコードID関連
   oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // Facegenファイルのパス格納用
   trimedOldFormID, trimedNewFormID, slBaseID, slReplacerID, wnamID, slSkinID: string; // SkyPatcher iniファイルの記入用
@@ -412,14 +410,14 @@ begin
 
     // ESLフラグを取得
     replacerFile := GetFile(e);
-    ESLFlag := GetElementNativeValues(ElementByIndex(replacerFile, 0), 'Record Header\Record Flags\ESL');
+    eslFlag := GetElementNativeValues(ElementByIndex(replacerFile, 0), 'Record Header\Record Flags\ESL');
 
-    if ESLFlag then
+    if eslFlag then
       AddMessage('ESLFlag is true.')
     else
       AddMessage('ESLFlag is false.');
 
-    if ESLFlag then begin
+    if eslFlag then begin
       // ESLフラグがオンの場合、レコード数と振り分け可能なForm IDの上限チェックを実施
       if ESLFlagedPluginTest(replacerFile) then begin
         Result := -1;
@@ -551,8 +549,8 @@ begin
 
   if not STOPFACEGENMANIPULATION then begin
     // Facegenファイルを新しいパスにコピー&リネームまたは移動&リネーム
-    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen, MESHMODE);
-    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen, TEXTUREMODE);
+    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen);
+    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen);
   end;
 
   // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する(必要？)
@@ -595,7 +593,7 @@ end;
 function Finalize: integer;
 var
   dlgSave: TSaveDialog;
-  ExportFileName, saveDir: string;
+  exportFileName, saveDir: string;
 begin
   if slExport.Count <> 0 then 
   begin
@@ -612,9 +610,9 @@ begin
       dlgSave.FileName := replacerFileName + '.ini';
   if dlgSave.Execute then 
     begin
-      ExportFileName := dlgSave.FileName;
-      AddMessage('Saving ' + ExportFileName);
-      slExport.SaveToFile(ExportFileName);
+      exportFileName := dlgSave.FileName;
+      AddMessage('Saving ' + exportFileName);
+      slExport.SaveToFile(exportFileName);
     end;
   finally
     dlgSave.Free;
