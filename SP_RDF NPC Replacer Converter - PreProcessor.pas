@@ -1,7 +1,7 @@
 unit UserScript;
 
-uses xEditAPI, SysUtils, StrUtils, Windows;
-uses 'Forms','Controls','StdCtrls','CheckLst','Dialogs';
+//uses xEditAPI, SysUtils, StrUtils, Windows;
+//uses 'Forms','Controls','StdCtrls','CheckLst','Dialogs';
 
 const
   // デバッグ用定数
@@ -19,16 +19,13 @@ const
   EXTESLVER = 1.71;
 
 var
-  // iniファイル出力用変数
-  slExport: TStringList;
-
   // ファイル関連変数
   firstRecordFileName, baseFileName, replacerFileName: string;
   testFile: boolean;
 
   // イニシャル処理で設定・使用する変数
   prefix, commentOut: string;
-  useFormID, removeFacegen, removeFacegenMissingRec, isInputProvided: boolean;
+  removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
 
 function ShowCheckboxForm(const options: TStringList; out selected: TStringList): Boolean;
 var
@@ -100,8 +97,7 @@ begin
     ch := s[i];
     if not ((ch >= 'A') and (ch <= 'Z') or
             (ch >= 'a') and (ch <= 'z') or
-            (ch >= '0') and (ch <= '9') or
-            (ch = '_')) then
+            (ch >= '0') and (ch <= '9')) then
     begin
       Result := false;
       Break;
@@ -121,12 +117,12 @@ function GetFaceGenPath(pluginName, formID: string; isNewPath, mode: boolean): s
 begin
   if mode = MESHMODE then
     if isNewPath = true then
-      Result := Format('%sSkyPatcher NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
+      Result := Format('%sSP_RDF NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
     else
       Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
   if mode = TEXTUREMODE then
     if isNewPath = true then
-      Result := Format('%sSkyPatcher NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
+      Result := Format('%sSP_RDF NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
     else
       Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
@@ -289,18 +285,14 @@ var
   opts, selected: TStringList;
   i: Integer;
 begin
-  slExport            := TStringList.Create;
   testFile            := false;
 
   firstRecordFileName := '';
   baseFileName        := '';
   replacerFileName    := '';
 
-  
-  commentOut          := '';
-  useFormID           := false;
-  removeFacegen       := false;
-  removeFacegenMissingRec   := false;
+  removeFaceGen       := false;
+  removeFaceGenMissingRec   := false;
   isInputProvided     := false;
   validInput          := false;
   
@@ -311,10 +303,9 @@ begin
 
   // 各オプションの設定
   try
-    opts.Add('Use Form ID for config file output');
-    opts.Add('Disable the config file by default');
-    opts.Add('Remove Facegen files in the replacer mod');
-    opts.Add('Remove NPC records without Facegen files');
+
+    opts.Add('Remove FaceGen files in the replacer mod');
+    opts.Add('Remove NPC records without FaceGen files');
 
     if ShowCheckboxForm(opts, selected) then
     begin
@@ -329,21 +320,13 @@ begin
     end;
     
 
-    // 出力ファイルに使うのはFormIDとEditorIDのどちらか
+    // コピー元のFaceGenファイルを残すか
     if selected[0] = 'True' then
-      useFormID := true;
-      
-    // 出力ファイルのデフォルト設定をすべて有効にするか確認
+      removeFaceGen := true;
+    
+    // FaceGenファイルを持たないNPCレコードをコピーするか
     if selected[1] = 'True' then
-      commentOut := ';';
-      
-    // コピー元のFacegenファイルを残すか
-    if selected[2] = 'True' then
-      removeFacegen := true;
-      
-    // Facegenファイルを持たないNPCレコードをコピーするか
-    if selected[3] = 'True' then
-      removeFacegenMissingRec := true;
+      removeFaceGenMissingRec := true;
       
   finally
     opts.Free;
@@ -352,7 +335,7 @@ begin
 
   // プレフィックスを入力
   repeat
-    isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z), digits (0-9), and the underscore (_) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
+    isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z) and digits (0-9) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
     if not isInputProvided then
     begin
       MessageDlg('Cancel was pressed, aborting the script.', mtInformation, [mbOK], 0);
@@ -396,8 +379,8 @@ var
   recordFlag, compareStrRslt: Cardinal;
   eslFlag, useTraitsFlag, missingFacegeom, missingFacetint: boolean;
   oldFormID, newFormID, oldEditorID, newEditorID, recordID: string; // レコードID関連
-  oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // Facegenファイルのパス格納用
-  trimedOldFormID, trimedNewFormID, slBaseID, slReplacerID, wnamID, slSkinID: string; // SkyPatcher iniファイルの記入用
+  oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
+
 begin
   // 選択中のプラグインを検証、最初のレコードのみ実行する
   if testFile = false then begin
@@ -465,7 +448,7 @@ begin
   missingFacetint := false;
   useTraitsFlag := false;
 
-  // コピー元のFormID,EditorID,Facegenファイルのパスを取得
+  // コピー元のFormID,EditorID,FaceGenファイルのパスを取得
   oldFormID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
   oldEditorID := GetElementEditValues(e, 'EDID');
 
@@ -474,7 +457,7 @@ begin
   oldTexturePath := GetFaceGenPath(baseFileName, oldFormID, false, TEXTUREMODE);
 //    AddMessage('oldTexturePath:' + oldTexturePath);
 
-  // Facegenファイルが存在するかチェック
+  // FaceGenファイルが存在するかチェック
   if not FileExists(oldMeshPath) then begin
     AddMessage('File not found: ' + oldMeshPath);
     missingFacegeom := true
@@ -492,7 +475,7 @@ begin
   
   // レコードIDを変数に格納
   recordID := 'Form ID: ' + oldFormID + ', Editor ID: ' + oldEditorID;
-  // Facegenファイルが存在しない場合の処理
+  // FaceGenファイルが存在しない場合の処理
   // FaceGeomかFaceTintのどちらか片方が存在していない場合
   if (missingFacegeom and not missingFacetint) or (not missingFacegeom and missingFacetint) then begin
     if missingFacegeom then
@@ -502,7 +485,6 @@ begin
     
     AddMessage(recordID);
     AddMessage('The script will be aborted.');
-    slExport.Clear;
     Result := -1;
     Exit;    
   end
@@ -510,18 +492,17 @@ begin
   else if missingFacegeom and missingFacetint then begin
     AddMessage('Neither a FaceGeom file nor a FaceTint file exists associated with this record.');
     // ユーザオプションに基づいてレコードを削除するか判断、削除したら次のレコードの処理へ移行
-    if removeFacegenMissingRec then begin
+    if removeFaceGenMissingRec then begin
       AddMessage('Remove this record based on the user''s options. ' + recordID);
       Remove(e);
       Exit;
     end;
     // Use Traitsフラグを持っていない場合は異常と判断してスクリプトを中断する
     if useTraitsFlag then
-      AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have Facegen files.')
+      AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.')
     else begin
-      AddMessage('This record (' + recordID + ') is expected to have a Facegen files, but no associated with Facegen files were found.');
+      AddMessage('This record (' + recordID + ') is expected to have a FaceGen files, but no associated with FaceGen files were found.');
       AddMessage('The script will be aborted.');
-      slExport.Clear;
       Result := -1;
       Exit;
     end;
@@ -541,84 +522,28 @@ begin
   SetElementEditValues(newRecord, 'EDID', newEditorID);
   // AddMessage('Created new record with Editor ID: ' + newEditorID);
   
-  // 新しいFacegenファイルのパスを取得
+  // 新しいFaceGenファイルのパスを取得
   newMeshPath := GetFaceGenPath(replacerFileName, newFormID, true, MESHMODE);
 //    AddMessage('newMeshPath:' + newMeshPath);
   newTexturePath := GetFaceGenPath(replacerFileName, newFormID, true, TEXTUREMODE);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   if not STOPFACEGENMANIPULATION then begin
-    // Facegenファイルを新しいパスにコピー&リネームまたは移動&リネーム
-    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFacegen);
-    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFacegen);
+    // FaceGenファイルを新しいパスにコピー&リネームまたは移動&リネーム
+    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFaceGen);
+    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFaceGen);
   end;
-
+  
   // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する(必要？)
-
-  // 出力ファイル用の配列操作
-  // Use Traitsフラグを持っているNPCレコードはiniファイルへの追記をスキップする
-  if useTraitsFlag then
-    AddMessage('Since this record has the Use Traits flag, it will be skipped from being added to the SkyPatcher ini file.')
-  else begin
-    if useFormID then begin
-      // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する
-      trimedOldFormID := IntToHex(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 1);
-      trimedNewFormID := IntToHex(GetElementNativeValues(newRecord, 'Record Header\FormID') and  $FFFFFF, 1);
-      
-      slBaseID := baseFileName + '|' + trimedOldFormID;
-      slReplacerID := replacerFileName + '|' + trimedNewFormID;
-    end
-    else begin
-      slBaseID := oldEditorID;
-      slReplacerID := newEditorID;
-    end;
-
-    // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映
-    wnamID := IntToHex(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 1);
-    //  AddMessage('wnamID is:' + wnamID);
-    if wnamID = '0' then
-      slSkinID := slReplacerID
-    else
-      slSkinID := replacerFileName + '|' + wnamID;
-
-    slExport.Add(';' + GetElementEditValues(e, 'FULL'));
-    slExport.Add(commentOut + 'filterByNpcs=' + slBaseID + ':copyVisualStyle=' + slReplacerID + ':skin=' + slSkinID + #13#10);
-  end;
-
+  
   // コピー元レコードを削除
   Remove(e);
 
 end;
 
 function Finalize: integer;
-var
-  dlgSave: TSaveDialog;
-  exportFileName, saveDir: string;
 begin
-  if slExport.Count <> 0 then 
-  begin
-  // SkyPatcher iniファイルの出力処理
-  saveDir := DataPath + 'SkyPatcher NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher NPC Replacer Converter\';
-  if not DirectoryExists(saveDir) then
-    ForceDirectories(saveDir);
 
-  dlgSave := TSaveDialog.Create(nil);
-    try
-      dlgSave.Options := dlgSave.Options + [ofOverwritePrompt];
-      dlgSave.Filter := 'Ini (*.ini)|*.ini';
-      dlgSave.InitialDir := saveDir;
-      dlgSave.FileName := replacerFileName + '.ini';
-  if dlgSave.Execute then 
-    begin
-      exportFileName := dlgSave.FileName;
-      AddMessage('Saving ' + exportFileName);
-      slExport.SaveToFile(exportFileName);
-    end;
-  finally
-    dlgSave.Free;
-    end;
-  end;
-    slExport.Free;
 end;
 
 end.
