@@ -9,7 +9,7 @@ var
   targetFileName, replacerFileName: string;
   
   // イニシャル処理で設定・使用する変数
-  useFormID, commentOutFlag: boolean;
+  useFormID, disableAll: boolean;
 
 function ShowCheckboxForm(const options: TStringList; out selected: TStringList): Boolean;
 var
@@ -156,7 +156,7 @@ begin
 
   useFormID           := false;
   
-  commentOutFlag      := false;
+  disableAll      := false;
   
   opts                := TStringList.Create;
   selected            := TStringList.Create;
@@ -187,7 +187,7 @@ begin
       
     // 出力ファイルのデフォルト設定をすべて無効にするか
     if selected[1] = 'True' then
-      commentOutFlag := true;
+      disableAll := true;
       
   finally
     opts.Free;
@@ -263,7 +263,7 @@ begin
   end;
   
   // オプションの選択に応じて、設定行をコメントアウトする
-  if commentOutFlag = true then
+  if disableAll then
     commentOutCopyVS    := '#';
 
   
