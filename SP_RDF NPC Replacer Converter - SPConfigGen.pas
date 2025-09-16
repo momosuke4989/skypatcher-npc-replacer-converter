@@ -9,7 +9,7 @@ var
   targetFileName, replacerFileName: string;
   
   // イニシャル処理で設定・使用する変数
-  useFormID, commentOutFlag, replaceSkin: boolean;
+  useFormID, disableAll, replaceSkin, forceEnableRace, forceEnableGender, forceEnableName, forceEnableVoiceType: boolean;
 
 function ShowCheckboxForm(const options: TStringList; out selected: TStringList): Boolean;
 var
@@ -158,9 +158,14 @@ begin
 
   useFormID           := false;
   
-  commentOutFlag      := false;
+  disableAll          := false;
   useFormID           := false;
   replaceSkin         := false;
+  
+  forceEnableRace         := false;
+  forceEnableGender       := false;
+  forceEnableName         := false;
+  forceEnableVoiceType    := false;
   
   opts                := TStringList.Create;
   selected            := TStringList.Create;
@@ -172,6 +177,10 @@ begin
     opts.Add('Use Form ID for config file output');
     opts.Add('Disable the config file by default');
     opts.Add('Replace Skin');
+    opts.Add('Force Replace Race');
+    opts.Add('Force Replace Gender');
+    opts.Add('Force Replace Name');
+    opts.Add('Force Replace VoiceType');
 
     if ShowCheckboxForm(opts, selected) then
     begin
@@ -192,11 +201,27 @@ begin
       
     // 出力ファイルのデフォルト設定をすべて無効にするか
     if selected[1] = 'True' then
-      commentOutFlag := true;
+      disableAll := true;
       
     // 肌を変更するか
     if selected[2] = 'True' then
       replaceSkin := true;
+      
+    // 種族を強制的に変更するか
+    if selected[3] = 'True' then
+      forceEnableRace := true;
+      
+    // 性別を強制的に変更するか
+    if selected[4] = 'True' then
+      forceEnableGender := true;
+      
+    // 名前を強制的に変更するか
+    if selected[5] = 'True' then
+      forceEnableName := true;
+      
+    // 音声タイプを強制的に変更するか
+    if selected[6] = 'True' then
+      forceEnableVoiceType := true;
       
   finally
     opts.Free;
@@ -313,7 +338,7 @@ begin
   
   
   // オプションの選択に応じて、設定行をコメントアウトする
-  if commentOutFlag = true then begin
+  if disableAll then begin
     commentOutCopyVS    := ';';
     commentOutSkin      := ';';
     commentOutRace      := ';';
@@ -322,19 +347,19 @@ begin
     commentOutVoiceType := ';';
   end
   else begin
-    if replaceSkin = false then
+    if not replaceSkin then
       commentOutSkin := ';';
     
-    if sameRace = true then
+    if not forceEnableRace and sameRace then
       commentOutRace := ';';
     
-    if sameGender = true then
+    if not forceEnableGender and sameGender then
       commentOutGender := ';';
     
-    if sameName = true then
+    if not forceEnableName and sameName then
       commentOutName := ';';
     
-    if sameVoiceType = true then
+    if not forceEnableVoiceType and sameVoiceType then
       commentOutVoiceType := ';';
   end;
   
