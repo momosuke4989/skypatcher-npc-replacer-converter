@@ -1,4 +1,7 @@
-unit UserScript;
+unit SPRDF_NPCReplacerConverter_ConfigGen;
+
+uses
+  SPRDF_NPCReplacerConverter_PreProcessor;
 
 const
   USE_EDITOR_ID = false;
@@ -170,7 +173,6 @@ begin
   useFormID           := false;
   
   disableAll          := false;
-  useFormID           := false;
   replaceVS           := false;
   replaceSkin         := false;
   

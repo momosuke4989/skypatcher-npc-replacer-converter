@@ -1,7 +1,4 @@
-unit UserScript;
-
-//uses xEditAPI, SysUtils, StrUtils, Windows;
-//uses 'Forms','Controls','StdCtrls','CheckLst','Dialogs';
+unit SPRDF_NPCReplacerConverter_PreProcessor;
 
 const
   // デバッグ用定数
@@ -24,7 +21,7 @@ var
   testFile: boolean;
 
   // イニシャル処理で設定・使用する変数
-  prefix, commentOut: string;
+  prefix: string;
   removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
 
 function ShowCheckboxForm(const options: TStringList; out selected: TStringList): Boolean;
