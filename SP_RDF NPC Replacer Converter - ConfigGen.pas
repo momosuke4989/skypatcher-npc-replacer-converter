@@ -41,8 +41,6 @@ begin
     end;
     
 
-    //checklist.Checked[2] := True;
-
     btnOK := TButton.Create(form);
     btnOK.Parent := form;
     btnOK.Caption := 'OK';
