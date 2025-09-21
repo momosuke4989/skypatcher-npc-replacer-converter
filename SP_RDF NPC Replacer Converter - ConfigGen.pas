@@ -1,8 +1,5 @@
 unit SPRDF_NPCReplacerConverter_ConfigGen;
 
-uses
-  SPRDF_NPCReplacerConverter_PreProcessor;
-
 const
   USE_EDITOR_ID = false;
 
