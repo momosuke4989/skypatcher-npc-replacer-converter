@@ -4,7 +4,7 @@ unit SPRDF_NPCReplacerConverter_PreProcessor;
 interface
 
 function RunPreProcInitialize: integer;
-function RunPreProcessor(e: IInterface): integer;
+function RunPreProcessor(const e: IInterface; var createdRecord: IInterface): integer;
 function RunPreProcFinalize: integer;
 
 implementation
@@ -36,7 +36,7 @@ var
   prefix: string;
   removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
 
-function ShowCheckboxForm(const options: TStringList; out selected: TStringList): Boolean;
+function ShowCheckboxForm(const options: TStringList; var selected: TStringList): Boolean;
 var
   form: TForm;
   checklist: TCheckListBox;
@@ -382,7 +382,7 @@ begin
   AddMessage('Prefix set to: ' + prefix);
 end;
 
-function DoProcess(e: IInterface): integer;
+function DoProcess(const e: IInterface; var createdRecord: IInterface): integer;
 var
   replacerFile: IwbFile;
   newRecord:  IInterface;
@@ -550,6 +550,9 @@ begin
     ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFaceGen);
   end;
   
+  if Assigned(newRecord) then
+    createdRecord := newRecord;
+  
   // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する(必要？)
   
   // コピー元レコードを削除
@@ -564,19 +567,22 @@ end;
 
 function RunPreProcInitialize: integer;
 begin
+  AddMessage('PreProcessor: Initialize');
   Result := DoInitialize;
 end;
 
-function RunPreProcessor(e: IInterface): integer;
+function RunPreProcessor(const e: IInterface; var createdRecord: IInterface): integer;
 begin
   Result := DoInitialize;
   if Result <> 0 then exit;
 
-  Result := DoProcess(e);
+  AddMessage('PreProcessor: Run PreProcess');
+  Result := DoProcess(e, createdRecord);
 end;
 
 function RunPreProcFinalize: integer;
 begin
+  AddMessage('PreProcessor: Finalize');
   Result := DoFinalize;
 end;
 
@@ -587,8 +593,11 @@ begin
 end;
 
 function Process(e: IInterface): integer;
+var dummy: IInterFace;
 begin
-  Result := DoProcess(e);
+  Result := DoProcess(e, dummy);
+  if Assigned(dummy) then
+    AddMessage('recieved NPC record name:' + Name(dummy));
 end;
 
 function Finalize: integer;
