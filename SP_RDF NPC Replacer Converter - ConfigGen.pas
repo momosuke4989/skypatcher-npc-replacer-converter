@@ -221,39 +221,19 @@ begin
     
 
     // 出力ファイルに使うのはFormIDとEditorIDのどちらか
-    if selected[0] = 'True' then
-      useFormID := true;
+    useFormID := (selected.Count > 0) and (selected[0] = 'True');
       
-    // 出力ファイルのデフォルト設定をすべて無効にするか
-    if selected[1] = 'True' then
-      disableAll := true;
+    // 出力ファイルの記述をすべてコメントアウトするか
+    disableAll := (selected.Count > 1) and (selected[1] = 'True');
       
     // SkyPatcher利用時のオプション設定
-    if useSkyPatcher and (selected.Count > 7) then begin
-      // 見た目を変更するか
-      if selected[2] = 'True' then
-        replaceVS := true;
-        
-      // 肌を変更するか
-      if selected[3] = 'True' then
-        replaceSkin := true;
-        
-      // 種族を強制的に変更するか
-      if selected[4] = 'True' then
-        forceEnableRace := true;
-        
-      // 性別を強制的に変更するか
-      if selected[5] = 'True' then
-        forceEnableGender := true;
-        
-      // 名前を強制的に変更するか
-      if selected[6] = 'True' then
-        forceEnableName := true;
-        
-      // 音声タイプを強制的に変更するか
-      if selected[7] = 'True' then
-        forceEnableVoiceType := true;
-        
+    if useSkyPatcher and (selected.Count >= 8) then begin
+      replaceVS := selected[2] = 'True';            // 見た目を変更するか
+      replaceSkin := selected[3] = 'True';          // 肌を変更するか
+      forceEnableRace := selected[4] = 'True';      // 種族を強制的に変更するか
+      forceEnableGender := selected[5] = 'True';    // 性別を強制的に変更するか
+      forceEnableName := selected[6] = 'True';      // 名前を強制的に変更するか
+      forceEnableVoiceType := selected[7] = 'True'; // 音声タイプを強制的に変更するか
     end;
   finally
     opts.Free;
@@ -416,8 +396,15 @@ begin
     
     trimedReplacerFormID := IntToHex(replacerFormID and  $FFFFFF, 1);
     
-    slTargetID := targetFileName + '|' + trimedTargetFormID;
-    slReplacerID := replacerFileName + '|' + trimedReplacerFormID;
+    if useSkyPatcher then begin
+      slTargetID := targetFileName + '|' + trimedTargetFormID;
+      slReplacerID := replacerFileName + '|' + trimedReplacerFormID;
+    end
+    else begin
+      slTargetID := trimedTargetFormID + '~' + targetFileName;
+      slReplacerID := trimedReplacerFormID + '~' + replacerFileName;
+    end;
+    
     slRace  := GetFileName(replacerRaceRecord) + '|' + IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1);
     slVoiceType := GetFileName(replacerVoiceTypeRecord) + '|' + IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1);
   end
@@ -474,12 +461,12 @@ begin
   
   // SkyPatcherかRDFの利用に応じて出力先、拡張子を変更
   if useSkyPatcher then begin
-    saveDir := DataPath + 'SP_RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SP_RDF NPC Replacer Converter\';
+    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher RDF NPC Replacer Converter\';
     filterString := 'Ini (*.ini)|*.ini';
     fileExtension := '.ini';
   end
   else begin
-    saveDir := DataPath + 'SP_RDF NPC Replacer Converter\SKSE\Plugins\RaceSwap\';
+    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\RaceSwap\';
     filterString := 'Txt (*.txt)|*.txt';
     fileExtension :=  '.txt';
   end;

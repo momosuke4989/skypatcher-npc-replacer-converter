@@ -1,5 +1,14 @@
 unit SPRDF_NPCReplacerConverter_PreProcessor;
 
+
+interface
+
+function RunInitialize: integer;
+function RunPreProcessor(e: IInterface): integer;
+function RunFinalize: integer;
+
+implementation
+
 const
   // デバッグ用定数
   STOPFACEGENMANIPULATION = false;
@@ -16,6 +25,9 @@ const
   EXTESLVER = 1.71;
 
 var
+  // 外部呼出し時の処理済判定用
+  RunPreProcDone: Boolean;
+  
   // ファイル関連変数
   firstRecordFileName, baseFileName, replacerFileName: string;
   testFile: boolean;
@@ -275,6 +287,58 @@ begin
   end;
 
 end;
+
+function DoInitialize: integer;
+begin
+  if not RunPreProcDone then begin
+    AddMessage('PreProcessor: Initialized');
+    RunPreProcDone := True;
+  end;
+  Result := 0; // 成功
+end;
+
+function DoProcess(e: IInterface): integer;
+begin
+  if not Assigned(e) then begin
+    Result := 1; // スキップ
+    exit;
+  end;
+
+  // 実際の処理
+  AddMessage('PreProcessor: Processing ' + Name(e));
+
+  Result := 0; // 成功
+end;
+
+function DoFinalize: integer;
+begin
+  AddMessage('PreProcessor: Finalize');
+  Result := 0; // 正常終了
+end;
+
+function RunInitialize: integer;
+begin
+  Result := DoInitialize;
+end;
+
+function RunFinalize: integer;
+begin
+  Result := DoFinalize;
+end;
+
+function RunPreProcessor(e: IInterface): integer;
+begin
+  Result := DoInitialize;
+  if Result <> 0 then exit;
+
+  Result := DoProcess(e);
+end;
+
+function RunFinalize: integer;
+begin
+  Result := DoFinalize;
+end;
+
 
 function Initialize: integer;
 var
@@ -540,7 +604,7 @@ end;
 
 function Finalize: integer;
 begin
-
+  DoFinalize;
 end;
 
 end.
