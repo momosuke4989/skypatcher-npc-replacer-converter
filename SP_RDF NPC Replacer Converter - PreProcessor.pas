@@ -3,9 +3,9 @@ unit SPRDF_NPCReplacerConverter_PreProcessor;
 
 interface
 
-function RunInitialize: integer;
+function RunPreProcInitialize: integer;
 function RunPreProcessor(e: IInterface): integer;
-function RunFinalize: integer;
+function RunPreProcFinalize: integer;
 
 implementation
 
@@ -289,58 +289,6 @@ begin
 end;
 
 function DoInitialize: integer;
-begin
-  if not RunPreProcDone then begin
-    AddMessage('PreProcessor: Initialized');
-    RunPreProcDone := True;
-  end;
-  Result := 0; // 成功
-end;
-
-function DoProcess(e: IInterface): integer;
-begin
-  if not Assigned(e) then begin
-    Result := 1; // スキップ
-    exit;
-  end;
-
-  // 実際の処理
-  AddMessage('PreProcessor: Processing ' + Name(e));
-
-  Result := 0; // 成功
-end;
-
-function DoFinalize: integer;
-begin
-  AddMessage('PreProcessor: Finalize');
-  Result := 0; // 正常終了
-end;
-
-function RunInitialize: integer;
-begin
-  Result := DoInitialize;
-end;
-
-function RunFinalize: integer;
-begin
-  Result := DoFinalize;
-end;
-
-function RunPreProcessor(e: IInterface): integer;
-begin
-  Result := DoInitialize;
-  if Result <> 0 then exit;
-
-  Result := DoProcess(e);
-end;
-
-function RunFinalize: integer;
-begin
-  Result := DoFinalize;
-end;
-
-
-function Initialize: integer;
 var
   validInput : boolean;
   opts, selected: TStringList;
@@ -362,6 +310,12 @@ begin
   
   Result              := 0;
 
+  {if not RunPreProcDone then begin
+    AddMessage('PreProcessor: Initialized');
+    RunPreProcDone := True;
+  end;
+  }
+  
   // 各オプションの設定
   try
 
@@ -397,43 +351,38 @@ begin
   // プレフィックスを入力
   repeat
     isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z) and digits (0-9) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
-    if not isInputProvided then
-    begin
+    if not isInputProvided then begin
       MessageDlg('Cancel was pressed, aborting the script.', mtInformation, [mbOK], 0);
       Result := -1;
       Exit;
     end;
 //    AddMessage('now prefix:' + prefix);
-    if prefix = '' then // 入力のチェック
-      begin
+    // 入力のチェック
+    if prefix = '' then begin
         MessageDlg('Input is empty. Please reenter prefix.', mtInformation, [mbOK], 0);
         validInput := false;
+    end
+    else begin
+      if InputValidation(prefix) then begin
+        AddMessage('The input is valid.');
+        validInput := true;
       end
-    else
-      begin
-        if InputValidation(prefix) then begin
-          AddMessage('The input is valid.');
-          validInput := true;
-        end
-        else begin
-          MessageDlg('The input is invalid. Only enter valid characters.', mtInformation, [mbOK], 0);
-          AddMessage('The input is invalid.');
-          validInput := false;
-        end;
+      else begin
+        MessageDlg('The input is invalid. Only enter valid characters.', mtInformation, [mbOK], 0);
+        AddMessage('The input is invalid.');
+        validInput := false;
       end;
-      
-    if validInput = false then begin
-      prefix := '';
     end;
+      
+    if validInput = false then
+      prefix := '';
 
   until (isInputProvided) and (validInput);
 
   AddMessage('Prefix set to: ' + prefix);
-
 end;
 
-function Process(e: IInterface): integer;
-
+function DoProcess(e: IInterface): integer;
 var
   replacerFile: IwbFile;
   newRecord:  IInterface;
@@ -443,6 +392,12 @@ var
   oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
 
 begin
+
+  {if not Assigned(e) then begin
+    Result := 1; // スキップ
+    exit;
+  end;
+  }
   // 選択中のプラグインを検証、最初のレコードのみ実行する
   if testFile = false then begin
     //  マスターファイルを編集しようとしていたら中止
@@ -600,6 +555,40 @@ begin
   // コピー元レコードを削除
   Remove(e);
 
+end;
+
+function DoFinalize: integer;
+begin
+  AddMessage('PreProcessor: Finalize');
+end;
+
+function RunPreProcInitialize: integer;
+begin
+  Result := DoInitialize;
+end;
+
+function RunPreProcessor(e: IInterface): integer;
+begin
+  Result := DoInitialize;
+  if Result <> 0 then exit;
+
+  Result := DoProcess(e);
+end;
+
+function RunPreProcFinalize: integer;
+begin
+  Result := DoFinalize;
+end;
+
+
+function Initialize: integer;
+begin
+  Result := DoInitialize;
+end;
+
+function Process(e: IInterface): integer;
+begin
+  Result := DoProcess(e);
 end;
 
 function Finalize: integer;
