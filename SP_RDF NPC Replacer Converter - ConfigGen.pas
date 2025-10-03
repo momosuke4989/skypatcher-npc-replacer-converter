@@ -1,4 +1,4 @@
-unit SPRDF_NPCReplacerConverter_ConfigGen;
+unit SP_RDF_NPCReplacerConverter_ConfigGen;
 
 const
   USE_EDITOR_ID = false;
@@ -461,7 +461,7 @@ begin
   
   // SkyPatcherかRDFの利用に応じて出力先、拡張子を変更
   if useSkyPatcher then begin
-    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher RDF NPC Replacer Converter\';
+    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher NPC Replacer Converter\';
     filterString := 'Ini (*.ini)|*.ini';
     fileExtension := '.ini';
   end
