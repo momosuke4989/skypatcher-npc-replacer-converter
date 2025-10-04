@@ -1,4 +1,47 @@
-unit SP_RDF_NPCReplacerConverter_ConfigGen;
+{
+  ==============================================================================
+   SP_RDF_NPCReplacerConverter_ConfigGenerator.pas
+  ==============================================================================
+
+   Description:
+     This script is part of the "SkyPatcher RDF NPC Replacer Converter" toolset.
+     It functions as the *Config Generator (ConfigGen)* phase, executed after
+     the PreProcessor. Its purpose is to create configuration files for either
+     **SkyPatcher** or **Race Distribution Framework (RDF)** based on user-selected
+     options and NPC record data gathered from the list of plugins currently loaded
+     in xEdit.
+
+   Features:
+     - Integrates seamlessly with the PreProcessor phase (optional).
+     - Prompts user to select output mode (SkyPatcher / RDF) and generation options.
+     - Scans and compares NPC records (original vs. replacer) to determine
+       which parameters (appearance, race, gender, etc.) should be replaced.
+     - Generates structured `.ini` (for SkyPatcher) or `.txt` (for RDF) config files.
+     - Automatically comments out or enables settings according to user preferences.
+
+   Usage:
+     1. Run this script in xEdit (SSEEdit) on your replacer plugin.
+     2. Select whether to run in Integration Mode (to invoke PreProcessor).
+     3. Choose your config generation target (SkyPatcher or RDF).
+     4. Select desired options in the checklist dialog.
+     5. The script will process NPC records and output a ready-to-use config file
+        under the `Data\SkyPatcher RDF NPC Replacer Converter\...` directory.
+
+   Notes:
+      - Intended for Skyrim SE/AE with SkyPatcher and RDF support.
+      - Uses `SP_RDF_NPCReplacerConverter_PreProcessor.pas` when Integration Mode is selected.
+      - This script can also be run standalone if the PreProcessor has already been applied.
+      - Compatible with both FormID- and EditorID-based reference methods.
+
+   Author:mmsk4989
+   Version: 2.0
+   Last Updated: [2025-10-04]
+  ==============================================================================
+}
+
+unit SP_RDF_NPCReplacerConverter_ConfigGenerator;
+
+uses 'SP_RDF NPC Replacer Converter - PreProcessor';
 
 const
   USE_EDITOR_ID = false;
@@ -9,9 +52,9 @@ var
   targetFileName, replacerFileName: string;
   
   // イニシャル処理で設定・使用する変数
-  useSkyPatcher, useFormID, disableAll, replaceVS, replaceSkin, forceEnableRace, forceEnableGender, forceEnableName, forceEnableVoiceType: boolean;
+  callPreProcessor, useSkyPatcher, useFormID, disableAll, replaceVS, replaceSkin, forceEnableRace, forceEnableGender, forceEnableName, forceEnableVoiceType: boolean;
 
-function ShowCheckboxForm(const options: TStringList; out selected: TStringList; caption: string): Boolean;
+function ShowCheckboxForm(const options: TStringList; var selected: TStringList; caption: string): Boolean;
 var
   form: TForm;
   checklist: TCheckListBox;
@@ -166,6 +209,7 @@ var
 begin
   slExport            := TStringList.Create;
 
+  callPreProcessor    := false;
   useSkyPatcher       := false;
   useFormID           := false;
   
@@ -185,7 +229,19 @@ begin
   
   Result              := 0;
   
-  if MessageDlg('Which do you want to generate config file for SkyPatcher or RDF?' + #13#10 + 'Yes: SkyPatcher  No: RDF', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  if MessageDlg(
+    'Run in Integration Mode?' + #13#10 +
+    'Yes = Run with PreProcessor' + #13#10 +
+    'No = Run ConfigGenerator only', mtConfirmation, [mbYes, mbNo], 0
+    ) = mrYes then
+    callPreProcessor := true;
+    
+  if MessageDlg(
+    'Select which config file to generate:' + #13#10 +
+    'Yes = Generate for SkyPatcher' + #13#10 +
+    'No = Generate for RDF',
+    mtConfirmation, [mbYes, mbNo], 0
+    ) = mrYes then
     useSkyPatcher := true;
   
   if useSkyPatcher then
@@ -193,6 +249,9 @@ begin
   else
     checkBoxCaption := 'Choose RDF Option';
 
+  if callPreProcessor then
+    Result := RunPreProcInitialize;
+    
   // 各オプションの設定
   try
     opts.Add('Use Form ID for config file output');
@@ -246,7 +305,7 @@ function Process(e: IInterface): integer;
 
 var
   replacerFlags, templateFlags, replacerRaceElement, replacerVoiceTypeElement, targetFlags, targetRaceElement, targetVoiceTypeElement: IInterface;
-  targetRecord, replacerRaceRecord, replacerVoiceTypeRecord, targetRaceRecord, targetVoiceTypeRecord: IwbMainRecord;
+  replacerRecord, targetRecord, replacerRaceRecord, replacerVoiceTypeRecord, targetRaceRecord, targetVoiceTypeRecord: IwbMainRecord;
   replacerName, targetName: string;
   replacerFormID, underscorePos: Cardinal;
   originalTargetID, recordSignature, targetFormID, targetEditorID, replacerEditorID: string; // レコードID関連
@@ -276,11 +335,16 @@ begin
   // リプレイサーMod名を取得
   replacerFileName := GetFileName(GetFile(e));
   
+  if callPreProcessor then
+    Result := RunPreProcessor(e, replacerRecord)
+  else
+    replacerRecord := e;
+  
   // リプレイサーNPCのForm ID, Editor IDを取得
-  replacerFormID := GetElementNativeValues(e, 'Record Header\FormID');
+  replacerFormID := GetElementNativeValues(replacerRecord, 'Record Header\FormID');
    //AddMessage('Replacer Form ID: ' + IntToStr(replacerFormID));
    //AddMessage('Replacer Form ID: ' + IntToHex(replacerFormID, 8));
-  replacerEditorID := GetElementEditValues(e, 'EDID');
+  replacerEditorID := GetElementEditValues(replacerRecord, 'EDID');
   // AddMessage('Replacer Editor ID: ' + replacerEditorID);
   
   // リプレイサーNPCのEditor IDからオリジナルのEditor IDを取得
@@ -289,6 +353,7 @@ begin
   
   // オリジナルのEditor IDからターゲットNPCのレコードを取得
   targetRecord := FindRecordByRecordID(originalTargetID, 'NPC_', USE_EDITOR_ID);
+  
   if not Assigned(targetRecord) then begin
     AddMessage('Target record not found. Processing will be skipped.');
     Exit;
@@ -304,11 +369,11 @@ begin
     //AddMessage('Target Record Editor ID: ' + targetEditorID);
   
   // リプレイサーNPCのフラグ、種族、名前、音声タイプを取得
-  replacerFlags := ElementByPath(e, 'ACBS - Configuration');
-  replacerRaceElement := ElementByPath(e, 'RNAM');
+  replacerFlags := ElementByPath(replacerRecord, 'ACBS - Configuration');
+  replacerRaceElement := ElementByPath(replacerRecord, 'RNAM');
   replacerRaceRecord := MasterOrSelf(LinksTo(replacerRaceElement));
-  replacerName := GetElementEditValues(e, 'FULL');
-  replacerVoiceTypeElement := ElementByPath(e, 'VTCK');
+  replacerName := GetElementEditValues(replacerRecord, 'FULL');
+  replacerVoiceTypeElement := ElementByPath(replacerRecord, 'VTCK');
   replacerVoiceTypeRecord := MasterOrSelf(LinksTo(replacerVoiceTypeElement));
   
   // レコードがuse traitsフラグを持っているか確認し、持っていた場合はスキップ
@@ -417,7 +482,7 @@ begin
   
   // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映。
   // 設定されていない場合はnullでデフォルトボディを指定。
-  wnamID := IntToHex(GetElementNativeValues(e, 'WNAM') and  $FFFFFF, 1);
+  wnamID := IntToHex(GetElementNativeValues(replacerRecord, 'WNAM') and  $FFFFFF, 1);
   //  AddMessage('wnamID is:' + wnamID);
   if wnamID = '0' then
     slSkinID := 'null'
@@ -456,6 +521,7 @@ var
   dlgSave: TSaveDialog;
   ExportFileName, saveDir, filterString, fileExtension: string;
 begin
+  RunPreProcFinalize;
   if slExport.Count <> 0 then 
   begin
   

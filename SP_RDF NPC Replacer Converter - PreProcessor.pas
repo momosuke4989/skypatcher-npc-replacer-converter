@@ -1,5 +1,38 @@
-unit SP_RDF_NPCReplacerConverter_PreProcessor;
+{
+  ==============================================================================
+   SP_RDF_NPCReplacerConverter_PreProcessor.pas
+  ==============================================================================
 
+   Description:
+     This script is part of the "SkyPatcher RDF NPC Replacer Converter" toolset.
+     It serves as the *PreProcessor* phase that prepares NPC records before
+     configuration generation. The script duplicates selected NPC records and
+     renames the Editor ID, copies or moves their associated FaceGen files,
+     and performs validation for ESL-flagged plugins to ensure safe FormID allocation.
+
+   Features:
+     - Prompts user for preprocessing options such as FaceGen removal.
+     - Validates ESL-flagged ESPs and resets invalid FormIDs if necessary.
+     - Copies or moves FaceGen (FaceGeom / FaceTint) files with renamed paths.
+     - Adds a prefix to Editor IDs of duplicated NPC records.
+     - Removes NPCs missing FaceGen files if specified by user.
+
+   Usage:
+     Run this script in xEdit (SSEEdit) on the target plugin before executing
+     the ConfigGen script. It is intended to be called from the main converter
+     or executed directly via "Apply Script" in the xEdit interface.
+
+   Notes:
+     - Compatible with ESL-flagged plugins (supports extended ESL headers).
+     - Dependent on standard xEdit functions; no external libraries required.
+
+   Author:mmsk4989
+   Version: 2.0
+   Last Updated: [2025-10-04]
+  ==============================================================================
+}
+
+unit SP_RDF_NPCReplacerConverter_PreProcessor;
 
 interface
 
@@ -126,12 +159,12 @@ function GetFaceGenPath(pluginName, formID: string; isNewPath, mode: boolean): s
 begin
   if mode = MESHMODE then
     if isNewPath = true then
-      Result := Format('%sSP_RDF NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
+      Result := Format('%sSkyPatcher RDF NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
     else
       Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
   if mode = TEXTUREMODE then
     if isNewPath = true then
-      Result := Format('%sSP_RDF NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
+      Result := Format('%sSkyPatcher RDF NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
     else
       Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
@@ -562,7 +595,7 @@ end;
 
 function DoFinalize: integer;
 begin
-  AddMessage('PreProcessor: Finalize');
+  
 end;
 
 function RunPreProcInitialize: integer;
@@ -573,9 +606,6 @@ end;
 
 function RunPreProcessor(const e: IInterface; var createdRecord: IInterface): integer;
 begin
-  Result := DoInitialize;
-  if Result <> 0 then exit;
-
   AddMessage('PreProcessor: Run PreProcess');
   Result := DoProcess(e, createdRecord);
 end;
