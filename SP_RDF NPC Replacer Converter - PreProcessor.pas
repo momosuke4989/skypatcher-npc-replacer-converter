@@ -34,6 +34,8 @@
 
 unit SP_RDF_NPCReplacerConverter_PreProcessor;
 
+uses 'NPC Replacer Converter - Shared\NPCRC_CommonUtils';
+
 interface
 
 function RunPreProcInitialize: integer;
@@ -58,9 +60,6 @@ const
   EXTESLVER = 1.71;
 
 var
-  // 外部呼出し時の処理済判定用
-  RunPreProcDone: Boolean;
-  
   // ファイル関連変数
   firstRecordFileName, baseFileName, replacerFileName: string;
   testFile: boolean;
@@ -68,84 +67,6 @@ var
   // イニシャル処理で設定・使用する変数
   prefix: string;
   removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
-
-function ShowCheckboxForm(const options: TStringList; var selected: TStringList): Boolean;
-var
-  form: TForm;
-  checklist: TCheckListBox;
-  btnOK, btnCancel: TButton;
-  i: Integer;
-begin
-  Result := False;
-
-  form := TForm.Create(nil);
-  try
-    form.Caption := 'Select Options';
-    form.Width := 350;
-    form.Height := 300;
-    form.Position := poScreenCenter;
-
-    checklist := TCheckListBox.Create(form);
-    checklist.Parent := form;
-    checklist.Align := alTop;
-    checklist.Height := 200;
-
-    // 選択肢を追加
-    for i := 0 to options.Count - 1 do begin
-      checklist.Items.Add(options[i]);
-    end;
-
-    btnOK := TButton.Create(form);
-    btnOK.Parent := form;
-    btnOK.Caption := 'OK';
-    btnOK.ModalResult := mrOk;
-    btnOK.Width := 75;
-    btnOK.Top := checklist.Top + checklist.Height + 10;
-    btnOK.Left := (form.ClientWidth div 2) - btnOK.Width - 10;
-
-    btnCancel := TButton.Create(form);
-    btnCancel.Parent := form;
-    btnCancel.Caption := 'Cancel';
-    btnCancel.ModalResult := mrCancel;
-    btnCancel.Width := 75;
-    btnCancel.Top := btnOK.Top;
-    btnCancel.Left := (form.ClientWidth div 2) + 10;
-
-    form.BorderStyle := bsDialog;
-    form.Position := poScreenCenter;
-
-    if form.ShowModal = mrOk then
-    begin
-      Result := True;
-      for i := 0 to checklist.Items.Count - 1 do
-        if checklist.Checked[i] then
-          selected.Add('True')
-        else
-          selected.Add('False');
-    end;
-  finally
-    form.Free;
-  end;
-end;
-
-function InputValidation(const s: string): Boolean;
-var
-  i: Integer;
-  ch: Char;
-begin
-  Result := true;
-  for i := 1 to Length(s) do
-  begin
-    ch := s[i];
-    if not ((ch >= 'A') and (ch <= 'Z') or
-            (ch >= 'a') and (ch <= 'z') or
-            (ch >= '0') and (ch <= '9')) then
-    begin
-      Result := false;
-      Break;
-    end;
-  end;
-end;
 
 function IsMasterAEPlugin(plugin: IInterface): Boolean;
 var
@@ -324,7 +245,8 @@ end;
 function DoInitialize: integer;
 var
   validInput : boolean;
-  opts, selected: TStringList;
+  opts, checkedOpts, disableOpts, selected: TStringList;
+  checkBoxCaption: string;
   i: Integer;
 begin
   testFile            := false;
@@ -339,23 +261,22 @@ begin
   validInput          := false;
   
   opts                := TStringList.Create;
+  checkedOpts         := TStringList.Create;
+  disableOpts         := TStringList.Create;
   selected            := TStringList.Create;
+  
+  checkBoxCaption             := 'Choose PreProcessor Option';
   
   Result              := 0;
 
-  {if not RunPreProcDone then begin
-    AddMessage('PreProcessor: Initialized');
-    RunPreProcDone := True;
-  end;
-  }
-  
+
   // 各オプションの設定
   try
 
     opts.Add('Remove FaceGen files in the replacer mod');
     opts.Add('Remove NPC records without FaceGen files');
 
-    if ShowCheckboxForm(opts, selected) then
+    if ShowCheckboxForm(opts, checkedOpts, disableOpts, selected, checkBoxCaption) then
     begin
       AddMessage('You selected:');
       for i := 0 to selected.Count - 1 do
@@ -378,6 +299,8 @@ begin
       
   finally
     opts.Free;
+    checkedOpts.Free;
+    disableOpts.Free;
     selected.Free;
   end;
 
@@ -396,7 +319,7 @@ begin
         validInput := false;
     end
     else begin
-      if InputValidation(prefix) then begin
+      if EditorIDInputValidation(prefix, false) then begin
         AddMessage('The input is valid.');
         validInput := true;
       end

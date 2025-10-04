@@ -42,6 +42,7 @@
 unit SP_RDF_NPCReplacerConverter_ConfigGenerator;
 
 uses 'SP_RDF NPC Replacer Converter - PreProcessor';
+uses 'NPC Replacer Converter - Shared\NPCRC_CommonUtils';
 
 const
   USE_EDITOR_ID = false;
@@ -53,143 +54,6 @@ var
   
   // イニシャル処理で設定・使用する変数
   callPreProcessor, useSkyPatcher, useFormID, disableAll, replaceVS, replaceSkin, forceEnableRace, forceEnableGender, forceEnableName, forceEnableVoiceType: boolean;
-
-function ShowCheckboxForm(const options: TStringList; var selected: TStringList; caption: string): Boolean;
-var
-  form: TForm;
-  checklist: TCheckListBox;
-  btnOK, btnCancel: TButton;
-  i: Integer;
-begin
-  Result := False;
-
-  form := TForm.Create(nil);
-  try
-    form.Caption := caption;
-    form.Width := 350;
-    form.Height := 300;
-    form.Position := poScreenCenter;
-
-    checklist := TCheckListBox.Create(form);
-    checklist.Parent := form;
-    checklist.Align := alTop;
-    checklist.Height := 200;
-
-    // 選択肢を追加
-    for i := 0 to options.Count - 1 do begin
-      checklist.Items.Add(options[i]);
-      // skinオプションはデフォルトをオンに設定
-      if (options[i] = 'Replace Visual Style') or (options[i] = 'Replace Skin') then
-        checklist.Checked[i] := true;
-    end;
-    
-
-    btnOK := TButton.Create(form);
-    btnOK.Parent := form;
-    btnOK.Caption := 'OK';
-    btnOK.ModalResult := mrOk;
-    btnOK.Width := 75;
-    btnOK.Top := checklist.Top + checklist.Height + 10;
-    btnOK.Left := (form.ClientWidth div 2) - btnOK.Width - 10;
-
-    btnCancel := TButton.Create(form);
-    btnCancel.Parent := form;
-    btnCancel.Caption := 'Cancel';
-    btnCancel.ModalResult := mrCancel;
-    btnCancel.Width := 75;
-    btnCancel.Top := btnOK.Top;
-    btnCancel.Left := (form.ClientWidth div 2) + 10;
-
-    form.BorderStyle := bsDialog;
-    form.Position := poScreenCenter;
-
-    if form.ShowModal = mrOk then
-    begin
-      Result := True;
-      for i := 0 to checklist.Items.Count - 1 do
-        if checklist.Checked[i] then
-          selected.Add('True')
-        else
-          selected.Add('False');
-    end;
-  finally
-    form.Free;
-  end;
-end;
-
-function RemoveLeadingZeros(const s: string): string;
-var
-  i: Integer;
-begin
-  i := 1;
-  // 先頭の '0' をスキップ
-  while (i <= Length(s)) and (s[i] = '0') do
-    Inc(i);
-  // すべてが '0' の場合は '0' を返す
-  if i > Length(s) then
-    Result := '0'
-  else
-    Result := Copy(s, i, Length(s) - i + 1);
-end;
-
-function FindRecordByRecordID(const recordID, signature: string; useFormID: boolean): IwbMainRecord;
-var
-  formID, i: cardinal;
-  editorID: string;
-  f:  IwbFile;
-  rec: IwbMainRecord;
-  npcRecordGroup: IwbGroupRecord;
-begin
-  Result := nil;
-  
-  if useFormID then begin
-    // StrToIntでは負数になってしまうので、StrToInt64で変換し、Cardinal型で受け取る。
-    formID := StrToInt64('$' + recordID);
-  //  AddMessage('Converted Form ID: ' + IntToStr(formID));
-  end
-  else
-    editorID := recordID;
-
-  // 0始まりに加えて、Skyrim.exeの分も足してループ回数を減らす。
-  for i := 0 to FileCount - 2 do begin
-    f := FileByLoadOrder(i);
-//    AddMessage('Searching file name: ' + GetFileName(f));
-    if useFormID then begin
-      rec := RecordByFormID(f, formID, True);
-  //    AddMessage('Record Form ID: ' + IntToStr(GetLoadOrderFormID(rec)));
-      // Form IDを取得する関数はいくつかあるが、ロードオーダーを含めたForm IDを取得できるのはGetLoadOrderFormID
-      if Assigned(rec) and (GetLoadOrderFormID(rec) = formID) then begin
-        AddMessage('Record is found by Form ID');
-        if (Signature(rec) = signature) then begin
-          AddMessage('Record signature is correct.');
-          Result := rec;
-        end
-        else
-          AddMessage('Record signature is incorrect.');
-        break;
-      end;
-    end
-    else begin
-      npcRecordGroup := GroupBySignature(f, signature);
-      rec := MainRecordByEditorID(npcRecordGroup, editorID);
-      if Assigned(rec) then begin
-        AddMessage('Record is found by Editor ID');
-        if (Signature(rec) = signature)  then begin
-          AddMessage('Record signature is correct.');
-          Result := rec;
-        end
-        else
-          AddMessage('Record signature is incorrect.');
-        break;
-      end;
-    end;
-  end;
-  if Assigned(Result) then
-    AddMessage('Target Record is found')
-  else
-    AddMessage('No target record found for the entered ID. Check the entered ID is correct and target file is loaded.');
-
-end;
 
 function GenerateVisualStyleString(const targetID, replacerID: string; useSkyPatcher: boolean): string;
 begin
@@ -203,7 +67,7 @@ end;
 function Initialize: integer;
 var
   validInput: boolean;
-  opts, selected: TStringList;
+  opts, checkedOpts, disableOpts, selected: TStringList;
   checkBoxCaption: string;
   i: Integer;
 begin
@@ -223,6 +87,8 @@ begin
   forceEnableVoiceType    := false;
   
   opts                := TStringList.Create;
+  checkedOpts         := TStringList.Create;
+  disableOpts         := TStringList.Create;
   selected            := TStringList.Create;
   
   checkBoxCaption := '';
@@ -256,17 +122,27 @@ begin
   try
     opts.Add('Use Form ID for config file output');
     opts.Add('Disable the config file by default');
-    
+    opts.Add('Replace Visual Style');
+    opts.Add('Replace Skin');
+    opts.Add('Force Replace Race');
+    opts.Add('Force Replace Gender');
+    opts.Add('Force Replace Name');
+    opts.Add('Force Replace VoiceType');
+
     if useSkyPatcher then begin
-      opts.Add('Replace Visual Style');
-      opts.Add('Replace Skin');
-      opts.Add('Force Replace Race');
-      opts.Add('Force Replace Gender');
-      opts.Add('Force Replace Name');
-      opts.Add('Force Replace VoiceType');
+      checkedOpts.Add('Replace Visual Style');
+      checkedOpts.Add('Replace Skin');
+    end
+    else begin
+      disableOpts.Add('Replace Visual Style');
+      disableOpts.Add('Replace Skin');
+      disableOpts.Add('Force Replace Race');
+      disableOpts.Add('Force Replace Gender');
+      disableOpts.Add('Force Replace Name');
+      disableOpts.Add('Force Replace VoiceType');
     end;
 
-    if ShowCheckboxForm(opts, selected, checkBoxCaption) then
+    if ShowCheckboxForm(opts, checkedOpts, disableOpts, selected, checkBoxCaption) then
     begin
       AddMessage('You selected:');
       for i := 0 to selected.Count - 1 do
@@ -280,22 +156,26 @@ begin
     
 
     // 出力ファイルに使うのはFormIDとEditorIDのどちらか
-    useFormID := (selected.Count > 0) and (selected[0] = 'True');
+    //useFormID := (selected.Count > 0) and (selected[0] = 'True');
+      useFormID := selected[0] = 'True';
       
     // 出力ファイルの記述をすべてコメントアウトするか
-    disableAll := (selected.Count > 1) and (selected[1] = 'True');
+    //disableAll := (selected.Count > 1) and (selected[1] = 'True');
+      disableAll := selected[1] = 'True';
       
     // SkyPatcher利用時のオプション設定
-    if useSkyPatcher and (selected.Count >= 8) then begin
+    //if useSkyPatcher and (selected.Count >= 8) then begin
       replaceVS := selected[2] = 'True';            // 見た目を変更するか
       replaceSkin := selected[3] = 'True';          // 肌を変更するか
       forceEnableRace := selected[4] = 'True';      // 種族を強制的に変更するか
       forceEnableGender := selected[5] = 'True';    // 性別を強制的に変更するか
       forceEnableName := selected[6] = 'True';      // 名前を強制的に変更するか
       forceEnableVoiceType := selected[7] = 'True'; // 音声タイプを強制的に変更するか
-    end;
+    //end;
   finally
     opts.Free;
+    checkedOpts.Free;
+    disableOpts.Free;
     selected.Free;
   end;
 
