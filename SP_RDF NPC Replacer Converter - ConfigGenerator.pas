@@ -400,44 +400,112 @@ function Finalize: integer;
 var
   dlgSave: TSaveDialog;
   ExportFileName, saveDir, filterString, fileExtension: string;
+  existingContent: TStringList;
+  userChoice: Integer;
+  savedFile:  boolean;
 begin
+  savedFile := false;
   RunPreProcFinalize;
-  if slExport.Count <> 0 then 
-  begin
+  // データがない場合はスキップ
+  if slExport.Count = 0 then begin
+    slExport.Free;
+    Exit;
+  end;
   
-  // SkyPatcherかRDFの利用に応じて出力先、拡張子を変更
+  // 出力設定の決定
   if useSkyPatcher then begin
-    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher NPC Replacer Converter\';
+    saveDir := DataPath + 'SP_RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SP_RDF NPC Replacer Converter\';
     filterString := 'Ini (*.ini)|*.ini';
     fileExtension := '.ini';
   end
   else begin
-    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\RaceSwap\';
+    saveDir := DataPath + 'SP_RDF NPC Replacer Converter\SKSE\Plugins\RaceSwap\';
     filterString := 'Txt (*.txt)|*.txt';
-    fileExtension :=  '.txt';
+    fileExtension := '.txt';
   end;
   
-  // 設定ファイルの出力処理
+  // ディレクトリ作成
   if not DirectoryExists(saveDir) then
     ForceDirectories(saveDir);
-
+  
+  // ファイル保存
   dlgSave := TSaveDialog.Create(nil);
-    try
-      dlgSave.Options := dlgSave.Options + [ofOverwritePrompt];
-      dlgSave.Filter := filterString;
-      dlgSave.InitialDir := saveDir;
-      dlgSave.FileName := replacerFileName + fileExtension;
-  if dlgSave.Execute then 
-    begin
-      ExportFileName := dlgSave.FileName;
-      AddMessage('Saving ' + ExportFileName);
-      slExport.SaveToFile(ExportFileName);
-    end;
+  try
+    dlgSave.Options := dlgSave.Options - [ofOverwritePrompt];
+    dlgSave.Filter := filterString;
+    dlgSave.InitialDir := saveDir;
+    dlgSave.FileName := replacerFileName + fileExtension;
+    repeat
+      savedFile := false;
+      
+      if not dlgSave.Execute then begin
+        // ダイアログを閉じたらループ終了
+        AddMessage('Save cancelled by user');
+        break;
+      end
+      else begin
+        ExportFileName := dlgSave.FileName;
+        
+        // ファイルが既に存在するかチェック
+        if FileExists(ExportFileName) then begin
+          // ユーザーに選択させる
+          userChoice := MessageDlg(
+            'File already exists: ' + ExtractFileName(ExportFileName) + #13#10 +
+            #13#10 +
+            'What do you want to do?' + #13#10 +
+            #13#10 +
+            'Yes: Append to existing file' + #13#10 +
+            'No: Overwrite the file' + #13#10 +
+            'Cancel: Do not save',
+            mtConfirmation,
+            [mbYes, mbNo, mbCancel],
+            0
+          );
+          
+          case userChoice of
+            mrYes: begin
+              // 追記モード
+              AddMessage('Appending to ' + ExportFileName);
+              existingContent := TStringList.Create;
+              try
+                existingContent.LoadFromFile(ExportFileName);
+                existingContent.AddStrings(slExport);
+                existingContent.SaveToFile(ExportFileName);
+                AddMessage('Content appended successfully');
+              finally
+                existingContent.Free;
+              end;
+              savedFile := true;  // ループを抜ける
+            end;
+            
+            mrNo: begin
+              // 上書きモード
+              AddMessage('Overwriting ' + ExportFileName);
+              slExport.SaveToFile(ExportFileName);
+              AddMessage('File overwritten successfully');
+              savedFile := true;  // ループを抜ける
+            end;
+            
+            mrCancel: begin
+              // キャンセル
+              AddMessage('Save cancelled');
+              savedFile := false;  // ループの開始に戻る
+            end;
+          end;
+        end
+        else begin
+          // ファイルが存在しない場合は通常通り保存
+          AddMessage('Saving ' + ExportFileName);
+          slExport.SaveToFile(ExportFileName);
+          AddMessage('File saved successfully');
+          savedFile := true;  // ループを抜ける
+        end;
+      end;
+    until savedFile;
   finally
     dlgSave.Free;
-    end;
-  end;
     slExport.Free;
+  end;
 end;
 
 end.
