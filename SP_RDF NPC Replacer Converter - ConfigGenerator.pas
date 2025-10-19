@@ -53,7 +53,7 @@ var
   targetFileName, replacerFileName: string;
   
   // イニシャル処理で設定・使用する変数
-  callPreProcessor, useSkyPatcher, useFormID, disableAll, replaceVS, replaceSkin, forceEnableRace, forceEnableGender, forceEnableName, forceEnableVoiceType: boolean;
+  callPreProcessor, useSkyPatcher, useFormID, disableAll, replaceVS, replaceSkin, forceEnableRace, forceEnableGender, forceEnableName, forceEnableVoiceType, dontOutputName: boolean;
 
 function GenerateVisualStyleString(const targetID, replacerID: string; useSkyPatcher: boolean): string;
 begin
@@ -85,6 +85,7 @@ begin
   forceEnableGender       := false;
   forceEnableName         := false;
   forceEnableVoiceType    := false;
+  dontOutputName          := false;
   
   opts                := TStringList.Create;
   checkedOpts         := TStringList.Create;
@@ -124,10 +125,11 @@ begin
     opts.Add('Disable the config file by default');
     opts.Add('Replace Visual Style');
     opts.Add('Replace Skin');
-    opts.Add('Force Replace Race');
-    opts.Add('Force Replace Gender');
-    opts.Add('Force Replace Name');
-    opts.Add('Force Replace VoiceType');
+    opts.Add('Force replace Race');
+    opts.Add('Force replace Gender');
+    opts.Add('Force replace Name');
+    opts.Add('Force replace VoiceType');
+    opts.Add('Do not output name settings');
 
     if useSkyPatcher then begin
       checkedOpts.Add('Replace Visual Style');
@@ -136,10 +138,11 @@ begin
     else begin
       disableOpts.Add('Replace Visual Style');
       disableOpts.Add('Replace Skin');
-      disableOpts.Add('Force Replace Race');
-      disableOpts.Add('Force Replace Gender');
-      disableOpts.Add('Force Replace Name');
-      disableOpts.Add('Force Replace VoiceType');
+      disableOpts.Add('Force replace Race');
+      disableOpts.Add('Force replace Gender');
+      disableOpts.Add('Force replace Name');
+      disableOpts.Add('Force replace VoiceType');
+      disableOpts.Add('Do not output name settings');
     end;
 
     if ShowCheckboxForm(opts, checkedOpts, disableOpts, selected, checkBoxCaption) then
@@ -164,13 +167,14 @@ begin
       disableAll := selected[1] = 'True';
       
     // SkyPatcher利用時のオプション設定
-    //if useSkyPatcher and (selected.Count >= 8) then begin
+    //if useSkyPatcher and (selected.Count >= 9) then begin
       replaceVS := selected[2] = 'True';            // 見た目を変更するか
       replaceSkin := selected[3] = 'True';          // 肌を変更するか
       forceEnableRace := selected[4] = 'True';      // 種族を強制的に変更するか
       forceEnableGender := selected[5] = 'True';    // 性別を強制的に変更するか
       forceEnableName := selected[6] = 'True';      // 名前を強制的に変更するか
       forceEnableVoiceType := selected[7] = 'True'; // 音声タイプを強制的に変更するか
+      dontOutputName := selected[8] = 'True'; // 名前を変更する設定行を出力させない
     //end;
   finally
     opts.Free;
@@ -388,7 +392,9 @@ begin
     slExport.Add(commentOutSkin + 'filterByNpcs=' + slTargetID + ':skin=' + slSkinID);
     slExport.Add(commentOutRace + 'filterByNpcs=' + slTargetID + ':race=' + slRace);
     slExport.Add(commentOutGender + 'filterByNpcs=' + slTargetID + slGender);
-    slExport.Add(commentOutName + 'filterByNpcs=' + slTargetID + ':fullName=~' + slName + '~');
+    if not dontOutputName then
+      slExport.Add(commentOutName + 'filterByNpcs=' + slTargetID + ':fullName=~' + slName + '~');
+      
     slExport.Add(commentOutVoiceType + 'filterByNpcs=' + slTargetID + ':voiceType=' + slVoiceType);
   end;
   
@@ -405,7 +411,10 @@ var
   savedFile:  boolean;
 begin
   savedFile := false;
-  RunPreProcFinalize;
+  
+  if callPreProcessor then
+    RunPreProcFinalize;
+    
   // データがない場合はスキップ
   if slExport.Count = 0 then begin
     slExport.Free;
