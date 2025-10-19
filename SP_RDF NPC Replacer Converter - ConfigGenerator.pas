@@ -242,7 +242,7 @@ begin
     AddMessage('Target record not found. Processing will be skipped.');
     Exit;
   end;
-  AddMessage('Found record: Editor ID: ' + GetElementEditValues(targetRecord, 'EDID') + ' Name: ' + GetElementEditValues(targetRecord, 'FULL'));
+  AddMessage('Found record: ' + Name(targetRecord));
   targetFileName := GetFileName(targetRecord);
   AddMessage('Target file name set to: ' + targetFileName);
   
@@ -265,7 +265,7 @@ begin
   useTraits := GetElementNativeValues(templateFlags, 'Use Traits') <> 0;
   
   if useTraits then begin
-    AddMessage('This NPC Record has Use Traits Template Flag. Processing will be skipped.');
+    AddMessage('This NPC Record has Use Traits Template Flag. Config generation will be skipped.');
     Exit;
   end;
   

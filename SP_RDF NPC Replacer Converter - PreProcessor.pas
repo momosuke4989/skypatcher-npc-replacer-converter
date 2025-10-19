@@ -46,7 +46,7 @@ implementation
 
 const
   // デバッグ用定数
-  STOPFACEGENMANIPULATION = true;
+  STOPFACEGENMANIPULATION = false;
 
   // Facegenファイルの操作用定数
   MESHMODE = true;
