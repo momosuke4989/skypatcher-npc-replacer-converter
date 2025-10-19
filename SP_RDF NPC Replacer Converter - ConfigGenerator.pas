@@ -423,12 +423,12 @@ begin
   
   // 出力設定の決定
   if useSkyPatcher then begin
-    saveDir := DataPath + 'SP_RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SP_RDF NPC Replacer Converter\';
+    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher NPC Replacer Converter\';
     filterString := 'Ini (*.ini)|*.ini';
     fileExtension := '.ini';
   end
   else begin
-    saveDir := DataPath + 'SP_RDF NPC Replacer Converter\SKSE\Plugins\RaceSwap\';
+    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\RaceSwap\';
     filterString := 'Txt (*.txt)|*.txt';
     fileExtension := '.txt';
   end;

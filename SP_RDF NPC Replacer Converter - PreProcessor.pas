@@ -46,7 +46,7 @@ implementation
 
 const
   // デバッグ用定数
-  STOPFACEGENMANIPULATION = false;
+  STOPFACEGENMANIPULATION = true;
 
   // Facegenファイルの操作用定数
   MESHMODE = true;
@@ -67,6 +67,10 @@ var
   // イニシャル処理で設定・使用する変数
   prefix: string;
   removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
+  
+  // サマリー用変数
+  recordCount, missingFaceGeomCount, missingFaceTintCount, missingFaceGenBothCount, useTraitsCount, removedRecordCount: integer;
+  missingFaceGeomRecordID, missingFaceTintRecordID, missingFaceGenBothRecordID: TStringList;
 
 function IsMasterAEPlugin(plugin: IInterface): Boolean;
 var
@@ -260,6 +264,17 @@ begin
   isInputProvided     := false;
   validInput          := false;
   
+  recordCount                 := 0;
+  missingFaceGeomCount        := 0;
+  missingFaceTintCount        := 0;
+  missingFaceGenBothCount     := 0;
+  useTraitsCount              := 0;
+  removedRecordCount          := 0;
+  
+  missingFaceGeomRecordID     := TStringList.Create;
+  missingFaceTintRecordID     := TStringList.Create;
+  missingFaceGenBothRecordID  := TStringList.Create;
+  
   opts                := TStringList.Create;
   checkedOpts         := TStringList.Create;
   disableOpts         := TStringList.Create;
@@ -414,7 +429,9 @@ begin
     AddMessage(GetElementEditValues(e, 'EDID') + ' does not overwrite other record.');
     Exit;
   end;
-
+  
+  Inc(recordCount);
+  
   // フラグを初期化
   missingFacegeom := false;
   missingFacetint := false;
@@ -447,38 +464,53 @@ begin
   
   // レコードIDを変数に格納
   recordID := 'Form ID: ' + oldFormID + ', Editor ID: ' + oldEditorID;
+  
   // FaceGenファイルが存在しない場合の処理
-  // FaceGeomかFaceTintのどちらか片方が存在していない場合
-  if (missingFacegeom and not missingFacetint) or (not missingFacegeom and missingFacetint) then begin
-    if missingFacegeom then
-      AddMessage('FaceGeom file associated with this record is missing.')
-    else
-      AddMessage('FaceTint file associated with this record is missing.');
-    
-    AddMessage(recordID);
-    AddMessage('The script will be aborted.');
-    Result := -1;
-    Exit;    
-  end
-  // 両方のファイルが存在していない場合
-  else if missingFacegeom and missingFacetint then begin
+  // FaceGeomかFaceTintのどちらも存在していない場合
+  if missingFacegeom and missingFacetint then begin
+    Inc(missingFaceGenBothCount);
+    AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     AddMessage('Neither a FaceGeom file nor a FaceTint file exists associated with this record.');
     // ユーザオプションに基づいてレコードを削除するか判断、削除したら次のレコードの処理へ移行
     if removeFaceGenMissingRec then begin
       AddMessage('Remove this record based on the user''s options. ' + recordID);
+      AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
+      Inc(removedRecordCount);
       Remove(e);
       Exit;
     end;
-    // Use Traitsフラグを持っていない場合は異常と判断してスクリプトを中断する
-    if useTraitsFlag then
-      AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.')
+    
+    // Use Traitsフラグを持っていない場合は異常と判断し、処理をスキップ
+    if useTraitsFlag then begin
+      AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.');
+      AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
+      Inc(useTraitsCount);
+      missingFaceGenBothRecordID.Add(recordID + ' (with UseTraits flag)');
+    end
     else begin
-      AddMessage('This record (' + recordID + ') is expected to have a FaceGen files, but no associated with FaceGen files were found.');
-      AddMessage('The script will be aborted.');
-      Result := -1;
+      AddMessage('This record (' + recordID + ') should have FaceGen files, but none were found.');
+      AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
+      missingFaceGenBothRecordID.Add(recordID);
       Exit;
     end;
+  end
+  else if missingFacegeom and not missingFacetint then begin
+    AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
+    AddMessage('FaceGeom file associated with this record (' + recordID + ') is missing.');
+    AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
+    Inc(missingFaceGeomCount);
+    missingFaceGeomRecordID.Add(recordID);
+    Exit;
+  end
+  else if not missingFacegeom and missingFacetint then begin
+    AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
+    AddMessage('FaceTint file associated with this record (' + recordID + ') is missing.');
+    AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
+    Inc(missingFaceTintCount);
+    missingFaceTintRecordID.Add(recordID);
+    Exit;
   end;
+  
 
   // レコードを複製
   newRecord := wbCopyElementToFile(e, GetFile(e), True, True);
@@ -517,8 +549,32 @@ begin
 end;
 
 function DoFinalize: integer;
+var
+  i: integer;
 begin
+  AddMessage('--------------------------------PreProcessing Summary--------------------------------');
+  AddMessage('Total Records Processed: ' + IntToStr(recordCount));
+  AddMessage('Total Records with Missing FaceGen Files: ' + IntToStr(missingFaceGenBothCount + missingFaceGeomCount + missingFaceTintCount));
+  AddMessage('Total Removed Records: ' + IntToStr(removedRecordCount));
   
+  AddMessage(#13#10 + 'Records Missing Both FaceGen Files: ' + IntToStr(missingFaceGenBothCount));
+  AddMessage(' (with UseTraits Flag): ' + IntToStr(useTraitsCount));
+  for i := 0 to missingFaceGenBothRecordID.Count - 1 do
+    AddMessage(missingFaceGenBothRecordID[i]);
+    
+  AddMessage(#13#10 + 'Records Missing FaceGeom File: ' + IntToStr(missingFaceGeomCount));
+  for i := 0 to missingFaceGeomRecordID.Count - 1 do
+    AddMessage(missingFaceGeomRecordID[i]);
+    
+  AddMessage(#13#10 + 'Records Missing FaceTint File: ' + IntToStr(missingFaceTintCount));
+  for i := 0 to missingFaceTintRecordID.Count - 1 do
+    AddMessage(missingFaceTintRecordID[i]);
+    
+  AddMessage(#13#10 + '------------------------------PreProcessing Summary End------------------------------');
+  
+  missingFaceGeomRecordID.Free;
+  missingFaceTintRecordID.Free;
+  missingFaceGenBothRecordID.Free;
 end;
 
 function RunPreProcInitialize: integer;
@@ -546,11 +602,12 @@ begin
 end;
 
 function Process(e: IInterface): integer;
-var dummy: IInterFace;
+var convertedRecord: IInterface;
 begin
-  Result := DoProcess(e, dummy);
-  if Assigned(dummy) then
-    AddMessage('recieved NPC record name:' + Name(dummy));
+  convertedRecord := nil;
+  Result := DoProcess(e, convertedRecord);
+  if Assigned(convertedRecord) then
+    AddMessage('Converted NPC record name:' + Name(convertedRecord));
 end;
 
 function Finalize: integer;
