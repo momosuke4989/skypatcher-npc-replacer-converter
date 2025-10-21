@@ -359,7 +359,7 @@ var
   newRecord:  IInterface;
   recordFlag, compareStrRslt: Cardinal;
   eslFlag, useTraitsFlag, missingFacegeom, missingFacetint: boolean;
-  oldFormID, newFormID, oldEditorID, newEditorID, recordID: string; // レコードID関連
+  oldFormID, newFormID, oldEditorID, newEditorID, recordID, recordFileName: string; // レコードID関連
   oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
 
 begin
@@ -462,8 +462,9 @@ begin
   if (recordFlag and $01) <> 0 then
     useTraitsFlag := true;
   
-  // レコードIDを変数に格納
+  // レコードID,ファイル名を変数に格納
   recordID := 'Form ID: ' + oldFormID + ', Editor ID: ' + oldEditorID;
+  recordFileName := 'File Name: ' + GetFileName(MasterOrSelf(e));
   
   // FaceGenファイルが存在しない場合の処理
   // FaceGeomかFaceTintのどちらも存在していない場合
@@ -490,7 +491,7 @@ begin
     else begin
       AddMessage('This record (' + recordID + ') should have FaceGen files, but none were found.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-      missingFaceGenBothRecordID.Add(recordID);
+      missingFaceGenBothRecordID.Add(recordFileName + ' ' + recordID);
       Exit;
     end;
   end
@@ -499,7 +500,7 @@ begin
     AddMessage('FaceGeom file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceGeomCount);
-    missingFaceGeomRecordID.Add(recordID);
+    missingFaceGeomRecordID.Add(recordFileName + ' ' + recordID);
     Exit;
   end
   else if not missingFacegeom and missingFacetint then begin
@@ -507,7 +508,7 @@ begin
     AddMessage('FaceTint file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceTintCount);
-    missingFaceTintRecordID.Add(recordID);
+    missingFaceTintRecordID.Add(recordFileName + ' ' + recordID);
     Exit;
   end;
   
