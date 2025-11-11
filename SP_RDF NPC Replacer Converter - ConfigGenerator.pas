@@ -194,6 +194,7 @@ var
   replacerFormID, underscorePos: Cardinal;
   originalTargetID, recordSignature, targetFormID, targetEditorID, replacerEditorID: string; // レコードID関連
   coChar, commentOutCopyVS, commentOutSkin, commentOutRace, commentOutGender, commentOutName, commentOutVoiceType: string; //コメントアウト用変数
+  slCommentOut: TStrignList;
   trimedTargetFormID, trimedReplacerFormID, slTargetID, slReplacerID, wnamID, slSkinID, slRace, slGender, slName, slVoiceType: string; // SkyPatcher iniファイルの記入用
   useTraits, sameRace, sameGender, sameName, sameVoiceType: boolean;
 begin
@@ -201,205 +202,219 @@ begin
   targetEditorID  := '';
   
   coChar               := '';
-  commentOutCopyVS     := '';
-  commentOutSkin       := '';
-  commentOutRace       := '';
-  commentOutGender     := '';
-  commentOutName       := '';
-  commentOutVoiceType  := '';
   
-  recordSignature := 'NPC_';
+  slCommentOut       := TStringList.Create;
+  try
+    slCommentOut.Values['CopyVS']    := '';
+    slCommentOut.Values['Skin']      := '';
+    slCommentOut.Values['Race']      := '';
+    slCommentOut.Values['Gender']    := '';
+    slCommentOut.Values['Name']      := '';
+    slCommentOut.Values['VoiceType'] := '';
+    
+    {
+    commentOutCopyVS     := '';
+    commentOutSkin       := '';
+    commentOutRace       := '';
+    commentOutGender     := '';
+    commentOutName       := '';
+    commentOutVoiceType  := '';
+    }
+    
+    recordSignature := 'NPC_';
 
-  // NPCレコードでなければスキップ
-  if Signature(e) <> 'NPC_' then begin
-    AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC record.');
-    Exit;
-  end;
-  
-  // リプレイサーMod名を取得
-  replacerFileName := GetFileName(GetFile(e));
-  
-  if callPreProcessor then
-    Result := RunPreProcessor(e, replacerRecord)
-  else
-    replacerRecord := e;
-  
-  // リプレイサーNPCのForm ID, Editor IDを取得
-  replacerFormID := GetElementNativeValues(replacerRecord, 'Record Header\FormID');
-   //AddMessage('Replacer Form ID: ' + IntToStr(replacerFormID));
-   //AddMessage('Replacer Form ID: ' + IntToHex(replacerFormID, 8));
-  replacerEditorID := GetElementEditValues(replacerRecord, 'EDID');
-  // AddMessage('Replacer Editor ID: ' + replacerEditorID);
-  
-  // リプレイサーNPCのEditor IDからオリジナルのEditor IDを取得
-  underscorePos := Pos('_', replacerEditorID);
-  originalTargetID := Copy(replacerEditorID, underscorePos + 1, Length(replacerEditorID) - underscorePos);
-  
-  // オリジナルのEditor IDからターゲットNPCのレコードを取得
-  targetRecord := FindRecordByRecordID(originalTargetID, 'NPC_', USE_EDITOR_ID);
-  
-  if not Assigned(targetRecord) then begin
-    AddMessage('Target record not found. Processing will be skipped.');
-    Exit;
-  end;
-  AddMessage('Found record: ' + Name(targetRecord));
-  targetFileName := GetFileName(targetRecord);
-  AddMessage('Target file name set to: ' + targetFileName);
-  
-  // ターゲットNPCのFormID,EditorIDを取得
-  targetFormID := IntToHex64(GetElementNativeValues(targetRecord, 'Record Header\FormID') and  $FFFFFF, 8);
-    //AddMessage('Target Record Form ID: ' + targetFormID);
-  targetEditorID := GetElementEditValues(targetRecord, 'EDID');
-    //AddMessage('Target Record Editor ID: ' + targetEditorID);
-  
-  // リプレイサーNPCのフラグ、種族、名前、音声タイプを取得
-  replacerFlags := ElementByPath(replacerRecord, 'ACBS - Configuration');
-  replacerRaceElement := ElementByPath(replacerRecord, 'RNAM');
-  replacerRaceRecord := MasterOrSelf(LinksTo(replacerRaceElement));
-  replacerName := GetElementEditValues(replacerRecord, 'FULL');
-  replacerVoiceTypeElement := ElementByPath(replacerRecord, 'VTCK');
-  replacerVoiceTypeRecord := MasterOrSelf(LinksTo(replacerVoiceTypeElement));
-  
-  // レコードがuse traitsフラグを持っているか確認し、持っていた場合はスキップ
-  templateFlags := ElementByPath(replacerFlags, 'Template Flags');
-  useTraits := GetElementNativeValues(templateFlags, 'Use Traits') <> 0;
-  
-  if useTraits then begin
-    AddMessage('This NPC Record has Use Traits Template Flag. Config generation will be skipped.');
-    Exit;
-  end;
-  
-  // ターゲットNPCのフラグ、種族、名前、音声タイプを取得
-  targetFlags := ElementByPath(targetRecord, 'ACBS - Configuration');
-  targetRaceElement := ElementByPath(targetRecord, 'RNAM');
-  targetRaceRecord := MasterOrSelf(LinksTo(targetRaceElement));
-  targetName := GetElementEditValues(targetRecord, 'FULL');
-  targetVoiceTypeElement := ElementByPath(targetRecord, 'VTCK');
-  targetVoiceTypeRecord := MasterOrSelf(LinksTo(targetVoiceTypeElement));
-  
-  // フォロワーNPCとターゲットNPCの種族、性別、音声タイプを比較して、結果をフラグに反映する。
-  if GetElementNativeValues(replacerRaceRecord, 'Record Header\FormID') = GetElementNativeValues(targetRaceRecord, 'Record Header\FormID') then
-    sameRace := true
-  else
-    sameRace := false;
-    
-  if GetElementEditValues(targetFlags, 'Flags\Female') = GetElementEditValues(replacerFlags, 'Flags\Female') then
-    sameGender := true
-  else
-    sameGender := false;
-    
-  if replacerName = targetName then
-    sameName := true
-  else
-    sameName := false;
-  
-  if GetElementNativeValues(replacerVoiceTypeRecord, 'Record Header\FormID') = GetElementNativeValues(targetVoiceTypeRecord, 'Record Header\FormID') then
-    sameVoiceType := true
-  else
-    sameVoiceType := false;
-  
-  // SkyPatcherかRDFの利用に応じてコメントアウト文字を切り替え
-  if useSkyPatcher then
-    coChar := ';'
-  else
-    coChar := '#';
-  
-  // オプションの選択に応じて、設定行をコメントアウトする
-  if disableAll then begin
-    commentOutCopyVS    := coChar;
-    commentOutSkin      := coChar;
-    commentOutRace      := coChar;
-    commentOutGender    := coChar;
-    commentOutName      := coChar;
-    commentOutVoiceType := coChar;
-  end
-  else begin
-    if useSkyPatcher and not replaceVS then
-      commentOutCopyVS := coChar;
-      
-    if not replaceSkin then
-      commentOutSkin := coChar;
-    
-    if not forceEnableRace and sameRace then
-      commentOutRace := coChar;
-    
-    if not forceEnableGender and sameGender then
-      commentOutGender := coChar;
-    
-    if not forceEnableName and sameName then
-      commentOutName := coChar;
-    
-    if not forceEnableVoiceType and sameVoiceType then
-      commentOutVoiceType := coChar;
-  end;
-  
-  // 出力ファイル用の配列操作
-  if useFormID then begin
-    // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する  
-    if  UpperCase(Copy(targetFormID, 1, 2)) = 'FE' then
-      trimedTargetFormID := Copy(targetFormID, 6, 8)
-    else
-      trimedTargetFormID := Copy(targetFormID, 3, 8);
-      
-    trimedTargetFormID := RemoveLeadingZeros(trimedTargetFormID);
-    
-    trimedReplacerFormID := IntToHex(replacerFormID and  $FFFFFF, 1);
-    
-    if useSkyPatcher then begin
-      slTargetID := targetFileName + '|' + trimedTargetFormID;
-      slReplacerID := replacerFileName + '|' + trimedReplacerFormID;
-    end
-    else begin
-      slTargetID := trimedTargetFormID + '~' + targetFileName;
-      slReplacerID := trimedReplacerFormID + '~' + replacerFileName;
+    // NPCレコードでなければスキップ
+    if Signature(e) <> 'NPC_' then begin
+      AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC record.');
+      Exit;
     end;
     
-    slRace  := GetFileName(replacerRaceRecord) + '|' + IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1);
-    slVoiceType := GetFileName(replacerVoiceTypeRecord) + '|' + IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1);
-  end
-  else begin
-    slTargetID := targetEditorID;
-    slReplacerID := replacerEditorID;
-    slRace  := EditorID(replacerRaceRecord);
-    slVoiceType := EditorID(replacerVoiceTypeRecord);
-  end;
-  
-  // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映。
-  // 設定されていない場合はnullでデフォルトボディを指定。
-  wnamID := IntToHex(GetElementNativeValues(replacerRecord, 'WNAM') and  $FFFFFF, 1);
-  //  AddMessage('wnamID is:' + wnamID);
-  if wnamID = '0' then
-    slSkinID := 'null'
-  else
-    slSkinID := replacerFileName + '|' + wnamID;
+    // リプレイサーMod名を取得
+    replacerFileName := GetFileName(GetFile(e));
     
-  // 性別フラグを反映する文字列を入力
-  if GetElementEditValues(replacerFlags, 'Flags\Female') = 1 then
-    slGender := ':setFlags=female'
-  else
-    slGender := ':removeFlags=female';
-  
-  // 名前を入力
-  slName := replacerName;
-  
-  
-  slExport.Add(coChar + GetElementEditValues(targetRecord, 'FULL'));
-  //slExport.Add(commentOutCopyVS + 'filterByNpcs=' + slTargetID + ':copyVisualStyle=' + slReplacerID);
-  slExport.Add(commentOutCopyVS + GenerateVisualStyleString(slTargetID, slReplacerID, useSkyPatcher));
-  
-  // SkyPatcher利用時のみ出力する
-  if useSkyPatcher then begin
-    slExport.Add(commentOutSkin + 'filterByNpcs=' + slTargetID + ':skin=' + slSkinID);
-    slExport.Add(commentOutRace + 'filterByNpcs=' + slTargetID + ':race=' + slRace);
-    slExport.Add(commentOutGender + 'filterByNpcs=' + slTargetID + slGender);
-    if not dontOutputName then
-      slExport.Add(commentOutName + 'filterByNpcs=' + slTargetID + ':fullName=~' + slName + '~');
+    if callPreProcessor then
+      Result := RunPreProcessor(e, replacerRecord)
+    else
+      replacerRecord := e;
+    
+    // リプレイサーNPCのForm ID, Editor IDを取得
+    replacerFormID := GetElementNativeValues(replacerRecord, 'Record Header\FormID');
+     //AddMessage('Replacer Form ID: ' + IntToStr(replacerFormID));
+     //AddMessage('Replacer Form ID: ' + IntToHex(replacerFormID, 8));
+    replacerEditorID := GetElementEditValues(replacerRecord, 'EDID');
+    // AddMessage('Replacer Editor ID: ' + replacerEditorID);
+    
+    // リプレイサーNPCのEditor IDからオリジナルのEditor IDを取得
+    underscorePos := Pos('_', replacerEditorID);
+    originalTargetID := Copy(replacerEditorID, underscorePos + 1, Length(replacerEditorID) - underscorePos);
+    
+    // オリジナルのEditor IDからターゲットNPCのレコードを取得
+    targetRecord := FindRecordByRecordID(originalTargetID, 'NPC_', USE_EDITOR_ID);
+    
+    if not Assigned(targetRecord) then begin
+      AddMessage('Target record not found. Processing will be skipped.');
+      Exit;
+    end;
+    AddMessage('Found record: ' + Name(targetRecord));
+    targetFileName := GetFileName(targetRecord);
+    AddMessage('Target file name set to: ' + targetFileName);
+    
+    // ターゲットNPCのFormID,EditorIDを取得
+    targetFormID := IntToHex64(GetElementNativeValues(targetRecord, 'Record Header\FormID') and  $FFFFFF, 8);
+      //AddMessage('Target Record Form ID: ' + targetFormID);
+    targetEditorID := GetElementEditValues(targetRecord, 'EDID');
+      //AddMessage('Target Record Editor ID: ' + targetEditorID);
+    
+    // リプレイサーNPCのフラグ、種族、名前、音声タイプを取得
+    replacerFlags := ElementByPath(replacerRecord, 'ACBS - Configuration');
+    replacerRaceElement := ElementByPath(replacerRecord, 'RNAM');
+    replacerRaceRecord := MasterOrSelf(LinksTo(replacerRaceElement));
+    replacerName := GetElementEditValues(replacerRecord, 'FULL');
+    replacerVoiceTypeElement := ElementByPath(replacerRecord, 'VTCK');
+    replacerVoiceTypeRecord := MasterOrSelf(LinksTo(replacerVoiceTypeElement));
+    
+    // レコードがuse traitsフラグを持っているか確認し、持っていた場合はスキップ
+    templateFlags := ElementByPath(replacerFlags, 'Template Flags');
+    useTraits := GetElementNativeValues(templateFlags, 'Use Traits') <> 0;
+    
+    if useTraits then begin
+      AddMessage('This NPC Record has Use Traits Template Flag. Config generation will be skipped.');
+      Exit;
+    end;
+    
+    // ターゲットNPCのフラグ、種族、名前、音声タイプを取得
+    targetFlags := ElementByPath(targetRecord, 'ACBS - Configuration');
+    targetRaceElement := ElementByPath(targetRecord, 'RNAM');
+    targetRaceRecord := MasterOrSelf(LinksTo(targetRaceElement));
+    targetName := GetElementEditValues(targetRecord, 'FULL');
+    targetVoiceTypeElement := ElementByPath(targetRecord, 'VTCK');
+    targetVoiceTypeRecord := MasterOrSelf(LinksTo(targetVoiceTypeElement));
+    
+    // フォロワーNPCとターゲットNPCの種族、性別、音声タイプを比較して、結果をフラグに反映する。
+    if GetElementNativeValues(replacerRaceRecord, 'Record Header\FormID') = GetElementNativeValues(targetRaceRecord, 'Record Header\FormID') then
+      sameRace := true
+    else
+      sameRace := false;
       
-    slExport.Add(commentOutVoiceType + 'filterByNpcs=' + slTargetID + ':voiceType=' + slVoiceType);
+    if GetElementEditValues(targetFlags, 'Flags\Female') = GetElementEditValues(replacerFlags, 'Flags\Female') then
+      sameGender := true
+    else
+      sameGender := false;
+      
+    if replacerName = targetName then
+      sameName := true
+    else
+      sameName := false;
+    
+    if GetElementNativeValues(replacerVoiceTypeRecord, 'Record Header\FormID') = GetElementNativeValues(targetVoiceTypeRecord, 'Record Header\FormID') then
+      sameVoiceType := true
+    else
+      sameVoiceType := false;
+    
+    // SkyPatcherかRDFの利用に応じてコメントアウト文字を切り替え
+    if useSkyPatcher then
+      coChar := ';'
+    else
+      coChar := '#';
+    
+    // オプションの選択に応じて、設定行をコメントアウトする
+    if disableAll then begin
+      slCommentOut.Values['CopyVS']    := '';
+      slCommentOut.Values['Skin']      := '';
+      slCommentOut.Values['Race']      := '';
+      slCommentOut.Values['Gender']    := '';
+      slCommentOut.Values['Name']      := '';
+      slCommentOut.Values['VoiceType'] := '';
+    end
+    else begin
+      if useSkyPatcher and not replaceVS then
+        slCommentOut.Values['CopyVS'] := coChar;
+        
+      if not replaceSkin then
+        slCommentOut.Values['Skin'] := coChar;
+      
+      if not forceEnableRace and sameRace then
+        slCommentOut.Values['Race'] := coChar;
+      
+      if not forceEnableGender and sameGender then
+        slCommentOut.Values['Gender'] := coChar;
+      
+      if not forceEnableName and sameName then
+        slCommentOut.Values['Name'] := coChar;
+      
+      if not forceEnableVoiceType and sameVoiceType then
+        slCommentOut.Values['VoiceType'] := coChar;
+    end;
+    
+    // 出力ファイル用の配列操作
+    if useFormID then begin
+      // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する  
+      if  UpperCase(Copy(targetFormID, 1, 2)) = 'FE' then
+        trimedTargetFormID := Copy(targetFormID, 6, 8)
+      else
+        trimedTargetFormID := Copy(targetFormID, 3, 8);
+        
+      trimedTargetFormID := RemoveLeadingZeros(trimedTargetFormID);
+      
+      trimedReplacerFormID := IntToHex(replacerFormID and  $FFFFFF, 1);
+      
+      if useSkyPatcher then begin
+        slTargetID := targetFileName + '|' + trimedTargetFormID;
+        slReplacerID := replacerFileName + '|' + trimedReplacerFormID;
+      end
+      else begin
+        slTargetID := trimedTargetFormID + '~' + targetFileName;
+        slReplacerID := trimedReplacerFormID + '~' + replacerFileName;
+      end;
+      
+      slRace  := GetFileName(replacerRaceRecord) + '|' + IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1);
+      slVoiceType := GetFileName(replacerVoiceTypeRecord) + '|' + IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1);
+    end
+    else begin
+      slTargetID := targetEditorID;
+      slReplacerID := replacerEditorID;
+      slRace  := EditorID(replacerRaceRecord);
+      slVoiceType := EditorID(replacerVoiceTypeRecord);
+    end;
+    
+    // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映。
+    // 設定されていない場合はnullでデフォルトボディを指定。
+    wnamID := IntToHex(GetElementNativeValues(replacerRecord, 'WNAM') and  $FFFFFF, 1);
+    //  AddMessage('wnamID is:' + wnamID);
+    if wnamID = '0' then
+      slSkinID := 'null'
+    else
+      slSkinID := replacerFileName + '|' + wnamID;
+      
+    // 性別フラグを反映する文字列を入力
+    if GetElementEditValues(replacerFlags, 'Flags\Female') = 1 then
+      slGender := ':setFlags=female'
+    else
+      slGender := ':removeFlags=female';
+    
+    // 名前を入力
+    slName := replacerName;
+    
+    
+    slExport.Add(coChar + GetElementEditValues(targetRecord, 'FULL'));
+    //slExport.Add(slCommentOut.Values['CopyVS'] + 'filterByNpcs=' + slTargetID + ':copyVisualStyle=' + slReplacerID);
+    slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(slTargetID, slReplacerID, useSkyPatcher));
+    
+    // SkyPatcher利用時のみ出力する
+    if useSkyPatcher then begin
+      slExport.Add(slCommentOut.Values['Skin'] + 'filterByNpcs=' + slTargetID + ':skin=' + slSkinID);
+      slExport.Add(slCommentOut.Values['Race'] + 'filterByNpcs=' + slTargetID + ':race=' + slRace);
+      slExport.Add(slCommentOut.Values['Gender'] + 'filterByNpcs=' + slTargetID + slGender);
+      if not dontOutputName then
+        slExport.Add(slCommentOut.Values['Name'] + 'filterByNpcs=' + slTargetID + ':fullName=~' + slName + '~');
+        
+      slExport.Add(slCommentOut.Values['VoiceType'] + 'filterByNpcs=' + slTargetID + ':voiceType=' + slVoiceType);
+    end;
+    
+    slExport.Add(#13#10);
+  finally
+    slCommentOut.Free;
   end;
-  
-  slExport.Add(#13#10);
-
 end;
 
 function Finalize: integer;

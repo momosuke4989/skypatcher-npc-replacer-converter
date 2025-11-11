@@ -2,7 +2,8 @@ unit NPCRC_CommonUtils;
 
 interface
 
-function ShowCheckboxForm(const options, checkedOpts, disableOpts: TStringList; var selected: TStringList; caption: string): Boolean;
+function mmskStrToBool(s: string): Boolean;
+function ShowCheckboxForm(const options, disableOpts: TStringList; caption: string): Boolean;
 function FormIDInputValidation(const s: string): Boolean;
 function EditorIDInputValidation(const s: string; useUnderScore: boolean): Boolean;
 function RemoveLeadingZeros(const s: string): string;
@@ -10,20 +11,28 @@ function FindRecordByRecordID(const recordID, signature: string; useFormID: bool
 
 implementation
 
-function ShowCheckboxForm((const options, checkedOpts, disableOpts: TStringList; var selected: TStringList; caption: string): Boolean;
+function mmskStrToBool(s: string): Boolean;
+begin
+  s := LowerCase(Trim(s));
+  if (s = 'true') or (s = '1') or (s = 'yes') then
+    Result := True
+  else
+    Result := False;
+end;
+
+function ShowCheckboxForm(const options, disableOpts: TStringList; caption: string): Boolean;
 var
   form: TForm;
   checklist: TCheckListBox;
   btnOK, btnCancel: TButton;
   i: Integer;
-  shouldCheck, shouldDisable: Boolean;
+  shouldDisable: Boolean;
 begin
   Result := False;
 
   // デバッグ: 入力内容を確認
 {  AddMessage('=== Debug Info ===');
   AddMessage('Options count: ' + IntToStr(options.Count));
-  AddMessage('CheckedOpts count: ' + IntToStr(checkedOpts.Count));
   AddMessage('DisableOpts count: ' + IntToStr(disableOpts.Count));
 }  
   form := TForm.Create(nil);
@@ -39,19 +48,15 @@ begin
     checklist.Height := 200;
 
     for i := 0 to options.Count - 1 do begin
-      checklist.Items.Add(options[i]);
+      checklist.Items.Add(options.ValueFromIndex[i]);
       
-      shouldCheck := false;
       shouldDisable := false;
       
-      // このオプションをチェックすべきか判定
-      shouldCheck := (checkedOpts.Count > 0) and (checkedOpts.IndexOf(options[i]) >= 0);
-      
       // このオプションを無効化すべきか判定
-      shouldDisable := (disableOpts.Count > 0) and (disableOpts.IndexOf(options[i]) >= 0);
+      shouldDisable := (disableOpts.Count > 0) and (disableOpts.IndexOf(options.ValueFromIndex[i]) >= 0);
       
       // デバッグ: 各項目の判定結果
-{      AddMessage('Item ' + IntToStr(i) + ': ' + options[i]);
+{      AddMessage('Item ' + IntToStr(i) + ': ' + options.ValueFromIndex[i]);
       
       if shouldCheck then
         AddMessage('  shouldCheck: True')
@@ -64,8 +69,8 @@ begin
         AddMessage('  shouldDisable: False');
 }
       
-      // 
-      if shouldCheck then
+      // このオプションをチェックすべきか判定
+      if mmskStrToBool(options.ValueFromIndex[i]) then
         checklist.Checked[i] := true;
       
       // 注意：ItemEnabledはtrue:無効化、false:有効化となる
@@ -101,9 +106,9 @@ begin
       Result := True;
       for i := 0 to checklist.Items.Count - 1 do
         if checklist.Checked[i] then
-          selected.Add('True')
+          options.ValueFromIndex[i] := 'True'
         else
-          selected.Add('False');
+          options.ValueFromIndex[i] := 'False';
     end;
   finally
     form.Free;
