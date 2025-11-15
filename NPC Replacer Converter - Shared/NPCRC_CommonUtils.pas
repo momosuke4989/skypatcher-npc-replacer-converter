@@ -2,7 +2,7 @@ unit NPCRC_CommonUtils;
 
 interface
 
-function mmskStrToBool(s: string): Boolean;
+function GetBoolSLValue(const key: string): Boolean;
 function ShowCheckboxForm(const options, disableOpts: TStringList; caption: string): Boolean;
 function FormIDInputValidation(const s: string): Boolean;
 function EditorIDInputValidation(const s: string; useUnderScore: boolean): Boolean;
@@ -11,13 +11,12 @@ function FindRecordByRecordID(const recordID, signature: string; useFormID: bool
 
 implementation
 
-function mmskStrToBool(s: string): Boolean;
+function GetBoolSLValue(const s: string): Boolean;
+var
+  value: string;
 begin
-  s := LowerCase(Trim(s));
-  if (s = 'true') or (s = '1') or (s = 'yes') then
-    Result := True
-  else
-    Result := False;
+  value := LowerCase(s);
+  Result := (value = 'true') or (value = '1') or (value = 'yes');
 end;
 
 function ShowCheckboxForm(const options, disableOpts: TStringList; caption: string): Boolean;
@@ -48,12 +47,12 @@ begin
     checklist.Height := 200;
 
     for i := 0 to options.Count - 1 do begin
-      checklist.Items.Add(options.ValueFromIndex[i]);
+      checklist.Items.Add(options.Names[i]);
       
       shouldDisable := false;
       
       // このオプションを無効化すべきか判定
-      shouldDisable := (disableOpts.Count > 0) and (disableOpts.IndexOf(options.ValueFromIndex[i]) >= 0);
+      shouldDisable := (disableOpts.Count > 0) and (disableOpts.IndexOf(options.Names[i]) >= 0);
       
       // デバッグ: 各項目の判定結果
 {      AddMessage('Item ' + IntToStr(i) + ': ' + options.ValueFromIndex[i]);
@@ -70,7 +69,7 @@ begin
 }
       
       // このオプションをチェックすべきか判定
-      if mmskStrToBool(options.ValueFromIndex[i]) then
+      if GetBoolSLValue(options.ValueFromIndex[i]) then
         checklist.Checked[i] := true;
       
       // 注意：ItemEnabledはtrue:無効化、false:有効化となる
