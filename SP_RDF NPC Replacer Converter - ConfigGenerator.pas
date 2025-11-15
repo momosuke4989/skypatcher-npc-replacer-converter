@@ -34,8 +34,8 @@
       - Compatible with both FormID- and EditorID-based reference methods.
 
    Author:mmsk4989
-   Version: 2.0
-   Last Updated: [2025-10-04]
+   Version: 2.1.2
+   Last Updated: [2025-11-15]
   ==============================================================================
 }
 

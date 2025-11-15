@@ -27,8 +27,8 @@
      - Dependent on standard xEdit functions; no external libraries required.
 
    Author:mmsk4989
-   Version: 2.0
-   Last Updated: [2025-10-04]
+   Version: 2.1.2
+   Last Updated: [2025-11-15]
   ==============================================================================
 }
 
@@ -249,7 +249,7 @@ end;
 function DoInitialize: integer;
 var
   validInput : boolean;
-  opts, checkedOpts, disableOpts, selected: TStringList;
+  opts, disableOpts: TStringList;
   checkBoxCaption: string;
   i: Integer;
 begin
@@ -276,9 +276,7 @@ begin
   missingFaceGenBothRecordID  := TStringList.Create;
   
   opts                := TStringList.Create;
-  checkedOpts         := TStringList.Create;
   disableOpts         := TStringList.Create;
-  selected            := TStringList.Create;
   
   checkBoxCaption             := 'Choose PreProcessor Option';
   
@@ -288,14 +286,14 @@ begin
   // 各オプションの設定
   try
 
-    opts.Add('Remove FaceGen files in the replacer mod');
-    opts.Add('Remove NPC records without FaceGen files');
+    opts.Values['Remove FaceGen files in the replacer mod'] := 'False';
+    opts.Values['Remove NPC records without FaceGen files'] := 'False';
 
-    if ShowCheckboxForm(opts, checkedOpts, disableOpts, selected, checkBoxCaption) then
+    if ShowCheckboxForm(opts, disableOpts, checkBoxCaption) then
     begin
       AddMessage('You selected:');
-      for i := 0 to selected.Count - 1 do
-        AddMessage(opts[i] + ' - ' + selected[i]);
+      for i := 0 to opts.Count - 1 do
+        AddMessage(opts.Names[i] + ' - ' + opts.ValueFromIndex[i]);
     end
     else begin
       AddMessage('Selection was canceled.');
@@ -305,18 +303,14 @@ begin
     
 
     // コピー元のFaceGenファイルを残すか
-    if selected[0] = 'True' then
-      removeFaceGen := true;
+    removeFaceGen := GetBoolSLValue(opts.Values['Remove FaceGen files in the replacer mod']);
     
     // FaceGenファイルを持たないNPCレコードをコピーするか
-    if selected[1] = 'True' then
-      removeFaceGenMissingRec := true;
+    removeFaceGenMissingRec := GetBoolSLValue(opts.Values['Remove NPC records without FaceGen files']);
       
   finally
     opts.Free;
-    checkedOpts.Free;
     disableOpts.Free;
-    selected.Free;
   end;
 
   // プレフィックスを入力
