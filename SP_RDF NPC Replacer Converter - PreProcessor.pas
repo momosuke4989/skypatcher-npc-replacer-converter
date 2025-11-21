@@ -27,8 +27,8 @@
      - Dependent on standard xEdit functions; no external libraries required.
 
    Author:mmsk4989
-   Version: 2.1.2
-   Last Updated: [2025-11-15]
+   Version: 2.2.0
+   Last Updated: [2025-11-21]
   ==============================================================================
 }
 
@@ -69,15 +69,29 @@ var
   removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
   
   // サマリー用変数
-  recordCount, missingFaceGeomCount, missingFaceTintCount, missingFaceGenBothCount, useTraitsCount, removedRecordCount: integer;
-  missingFaceGeomRecordID, missingFaceTintRecordID, missingFaceGenBothRecordID: TStringList;
+  recordCount, missingFaceGeomCount,
+  missingFaceTintCount, missingFaceGenBothCount,
+  useTraitsCount, removedRecordCount: integer;
+  
+  missingFaceGeomRecordID,
+  missingFaceTintRecordID,
+  missingFaceGenBothRecordID: TStringList;
 
 function IsMasterAEPlugin(plugin: IInterface): Boolean;
 var
   pluginName  : String;
 Begin
   pluginName := GetFileName(plugin);
-  Result := (CompareStr(pluginName, 'Skyrim.esm') = 0) or (CompareStr(pluginName, 'Update.esm') = 0) or (CompareStr(pluginName, 'Dawnguard.esm') = 0) or (CompareStr(pluginName, 'HearthFires.esm') = 0) or (CompareStr(pluginName, 'Dragonborn.esm') = 0) or (CompareStr(pluginName, 'ccBGSSSE001-Fish.esm') = 0) or (CompareStr(pluginName, 'ccQDRSSE001-SurvivalMode.esl') = 0) or (CompareStr(pluginName, 'ccBGSSSE037-Curios.esl') = 0) or (CompareStr(pluginName, 'ccBGSSSE025-AdvDSGS.esm') = 0) or (CompareStr(pluginName, '_ResourcePack.esl') = 0);
+  Result := (CompareStr(pluginName, 'Skyrim.esm') = 0) or
+            (CompareStr(pluginName, 'Update.esm') = 0) or
+            (CompareStr(pluginName, 'Dawnguard.esm') = 0) or
+            (CompareStr(pluginName, 'HearthFires.esm') = 0) or
+            (CompareStr(pluginName, 'Dragonborn.esm') = 0) or
+            (CompareStr(pluginName, 'ccBGSSSE001-Fish.esm') = 0) or
+            (CompareStr(pluginName, 'ccQDRSSE001-SurvivalMode.esl') = 0) or
+            (CompareStr(pluginName, 'ccBGSSSE037-Curios.esl') = 0) or
+            (CompareStr(pluginName, 'ccBGSSSE025-AdvDSGS.esm') = 0) or
+            (CompareStr(pluginName, '_ResourcePack.esl') = 0);
 End;
 
 function GetFaceGenPath(pluginName, formID: string; isNewPath, mode: boolean): string;
@@ -246,10 +260,98 @@ begin
 
 end;
 
+procedure ReplaceFaceTintPath(faceMeshPath, faceTextureFullPath: string);
+var
+    nif              : TwbNifFile;
+    block            : TwbNifBlock;
+    element          : TdfElement;
+    lTextureList     : TList;
+    i, j, p          : Integer;
+    key,
+    newFaceTintPath  : string;
+    findFaceTintPath : boolean;
+begin
+    nif := TwbNifFile.Create;
+    nif.LoadFromFile(faceMeshPath);
+    
+    findFaceTintPath := false;
+    
+    lTextureList := TList.Create;
+    
+    // Iterate over all blocks in a nif file and locate elements holding textures.
+    for i := 0 to nif.BlocksCount - 1 do begin
+        block := nif.Blocks[i];
+        
+        if block.BlockType = 'BSShaderTextureSet' then begin
+            element := block.Elements['Textures'];
+            for j := 0 to element.Count - 1 do
+                lTextureList.Add(element[j]);
+        end; 
+    end;
+    
+    //AddMessage(Format('Found %d elements.', [Elements.Count]));
+
+    // Skip to the next file If nothing was found.
+    if lTextureList.Count = 0 then begin
+      lTextureList.Free;
+      nif.Free;
+      Exit;
+    end;
+    
+    // Do text replacement in collected elements.
+    for i := 0 to lTextureList.Count - 1 do begin
+      if not Assigned(lTextureList[i]) then
+        continue;
+
+      element := TdfElement(lTextureList[i]);
+      
+      if element.EditValue = '' then
+        continue;
+        
+      if Pos('FaceTint', element.EditValue) > 0 then begin
+        findFaceTintPath := true;
+        break;
+      end;
+        
+{
+      // 元の文字列を取得
+      oldFaceTintPath := element.EditValue;
+      if oldFaceTintPath = '' then
+        continue;
+
+      if Pos('FaceTint', oldFaceTintPath) > 0 then begin
+        key := 'textures\actors\character\FaceGenData\FaceTint\';
+        p := Pos(LowerCase(key), LowerCase(faceTextureFullPath));
+        newFaceTintPath := Copy(faceTextureFullPath, p, Length(faceTextureFullPath) - p + 1);
+        element.EditValue := newFaceTintPath;
+        // Get the root of the last processed element (the file element itself) and save.
+        element.Root.SaveToFile(faceMeshPath);
+        //AddMessage(Format('Processed face %s.', [faceMeshPath]));
+      end;
+      }
+    end;
+    
+    if not findFaceTintPath then begin
+      AddMessage('FaceTint file path not found.');
+      Exit;
+    end;
+    
+    // 新しいFaceTintパスをnifファイルに設定
+    key := 'textures\actors\character\FaceGenData\FaceTint\';
+    p := Pos(LowerCase(key), LowerCase(faceTextureFullPath));
+    newFaceTintPath := Copy(faceTextureFullPath, p, Length(faceTextureFullPath) - p + 1);
+    element.EditValue := newFaceTintPath;
+
+    element.Root.SaveToFile(faceMeshPath);
+
+    lTextureList.Free;
+    nif.Free;    
+end;
+
 function DoInitialize: integer;
 var
   validInput : boolean;
-  opts, disableOpts: TStringList;
+  slOpts, slDisableOpts: TStringList;
   checkBoxCaption: string;
   i: Integer;
 begin
@@ -275,8 +377,8 @@ begin
   missingFaceTintRecordID     := TStringList.Create;
   missingFaceGenBothRecordID  := TStringList.Create;
   
-  opts                := TStringList.Create;
-  disableOpts         := TStringList.Create;
+  slOpts                := TStringList.Create;
+  slDisableOpts         := TStringList.Create;
   
   checkBoxCaption             := 'Choose PreProcessor Option';
   
@@ -286,14 +388,14 @@ begin
   // 各オプションの設定
   try
 
-    opts.Values['Remove FaceGen files in the replacer mod'] := 'False';
-    opts.Values['Remove NPC records without FaceGen files'] := 'False';
+    slOpts.Values['Remove FaceGen files in the replacer mod'] := 'False';
+    slOpts.Values['Remove NPC records without FaceGen files'] := 'False';
 
-    if ShowCheckboxForm(opts, disableOpts, checkBoxCaption) then
+    if ShowCheckboxForm(slOpts, slDisableOpts, checkBoxCaption) then
     begin
       AddMessage('You selected:');
-      for i := 0 to opts.Count - 1 do
-        AddMessage(opts.Names[i] + ' - ' + opts.ValueFromIndex[i]);
+      for i := 0 to slOpts.Count - 1 do
+        AddMessage(slOpts.Names[i] + ' - ' + slOpts.ValueFromIndex[i]);
     end
     else begin
       AddMessage('Selection was canceled.');
@@ -303,14 +405,14 @@ begin
     
 
     // コピー元のFaceGenファイルを残すか
-    removeFaceGen := GetBoolSLValue(opts.Values['Remove FaceGen files in the replacer mod']);
+    removeFaceGen := GetBoolSLValue(slOpts.Values['Remove FaceGen files in the replacer mod']);
     
     // FaceGenファイルを持たないNPCレコードをコピーするか
-    removeFaceGenMissingRec := GetBoolSLValue(opts.Values['Remove NPC records without FaceGen files']);
+    removeFaceGenMissingRec := GetBoolSLValue(slOpts.Values['Remove NPC records without FaceGen files']);
       
   finally
-    opts.Free;
-    disableOpts.Free;
+    slOpts.Free;
+    slDisableOpts.Free;
   end;
 
   // プレフィックスを入力
@@ -352,9 +454,13 @@ var
   replacerFile: IwbFile;
   newRecord:  IInterface;
   recordFlag, compareStrRslt: Cardinal;
-  eslFlag, useTraitsFlag, missingFacegeom, missingFacetint: boolean;
-  oldFormID, newFormID, oldEditorID, newEditorID, recordID, recordFileName: string; // レコードID関連
-  oldMeshPath, oldTexturePath, newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
+  eslFlag, useTraitsFlag,
+  missingFacegeom, missingFacetint: boolean;
+  oldFormID, newFormID,
+  oldEditorID, newEditorID,
+  recordID, recordFileName: string; // レコードID関連
+  oldMeshPath, oldTexturePath,
+  newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
 
 begin
 
@@ -528,15 +634,16 @@ begin
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   if not STOPFACEGENMANIPULATION then begin
-    // FaceGenファイルを新しいパスにコピー&リネームまたは移動&リネーム
-    ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFaceGen);
-    ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFaceGen);
+    if not missingFacegeom and not missingFacetint then begin
+      // FaceGenファイルを新しいパスにコピー&リネームまたは移動&リネーム
+      ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFaceGen);
+      ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFaceGen);
+      ReplaceFaceTintPath(newMeshPath, newTexturePath);
+    end;
   end;
   
   if Assigned(newRecord) then
     createdRecord := newRecord;
-  
-  // TODO:meshファイル内のfacetintのパスが古い情報のままなので変更する(必要？)
   
   // コピー元レコードを削除
   Remove(e);
