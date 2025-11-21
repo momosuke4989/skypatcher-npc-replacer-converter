@@ -312,23 +312,6 @@ begin
         findFaceTintPath := true;
         break;
       end;
-        
-{
-      // 元の文字列を取得
-      oldFaceTintPath := element.EditValue;
-      if oldFaceTintPath = '' then
-        continue;
-
-      if Pos('FaceTint', oldFaceTintPath) > 0 then begin
-        key := 'textures\actors\character\FaceGenData\FaceTint\';
-        p := Pos(LowerCase(key), LowerCase(faceTextureFullPath));
-        newFaceTintPath := Copy(faceTextureFullPath, p, Length(faceTextureFullPath) - p + 1);
-        element.EditValue := newFaceTintPath;
-        // Get the root of the last processed element (the file element itself) and save.
-        element.Root.SaveToFile(faceMeshPath);
-        //AddMessage(Format('Processed face %s.', [faceMeshPath]));
-      end;
-      }
     end;
     
     if not findFaceTintPath then begin
