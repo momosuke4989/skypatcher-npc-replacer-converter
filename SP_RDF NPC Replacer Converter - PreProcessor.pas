@@ -73,9 +73,9 @@ var
   missingFaceTintCount, missingFaceGenBothCount,
   useTraitsCount, removedRecordCount: integer;
   
-  missingFaceGeomRecordID,
-  missingFaceTintRecordID,
-  missingFaceGenBothRecordID: TStringList;
+  slMissingFaceGeomRecordID,
+  slMissingFaceTintRecordID,
+  slMissingFaceGenBothRecordID: TStringList;
 
 function IsMasterAEPlugin(plugin: IInterface): Boolean;
 var
@@ -356,9 +356,9 @@ begin
   useTraitsCount              := 0;
   removedRecordCount          := 0;
   
-  missingFaceGeomRecordID     := TStringList.Create;
-  missingFaceTintRecordID     := TStringList.Create;
-  missingFaceGenBothRecordID  := TStringList.Create;
+  slMissingFaceGeomRecordID     := TStringList.Create;
+  slMissingFaceTintRecordID     := TStringList.Create;
+  slMissingFaceGenBothRecordID  := TStringList.Create;
   
   slOpts                := TStringList.Create;
   slDisableOpts         := TStringList.Create;
@@ -569,12 +569,12 @@ begin
       AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
       Inc(useTraitsCount);
-      missingFaceGenBothRecordID.Add(recordID + ' (with UseTraits flag)');
+      slMissingFaceGenBothRecordID.Add(recordID + ' (with UseTraits flag)');
     end
     else begin
       AddMessage('This record (' + recordID + ') should have FaceGen files, but none were found.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-      missingFaceGenBothRecordID.Add(recordFileName + ' ' + recordID);
+      slMissingFaceGenBothRecordID.Add(recordFileName + ' ' + recordID);
       Exit;
     end;
   end
@@ -583,7 +583,7 @@ begin
     AddMessage('FaceGeom file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceGeomCount);
-    missingFaceGeomRecordID.Add(recordFileName + ' ' + recordID);
+    slMissingFaceGeomRecordID.Add(recordFileName + ' ' + recordID);
     Exit;
   end
   else if not missingFacegeom and missingFacetint then begin
@@ -591,7 +591,7 @@ begin
     AddMessage('FaceTint file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceTintCount);
-    missingFaceTintRecordID.Add(recordFileName + ' ' + recordID);
+    slMissingFaceTintRecordID.Add(recordFileName + ' ' + recordID);
     Exit;
   end;
   
@@ -644,22 +644,22 @@ begin
   
   AddMessage(#13#10 + 'Records Missing Both FaceGen Files: ' + IntToStr(missingFaceGenBothCount));
   AddMessage(' (with UseTraits Flag): ' + IntToStr(useTraitsCount));
-  for i := 0 to missingFaceGenBothRecordID.Count - 1 do
-    AddMessage(missingFaceGenBothRecordID[i]);
+  for i := 0 to slMissingFaceGenBothRecordID.Count - 1 do
+    AddMessage(slMissingFaceGenBothRecordID[i]);
     
   AddMessage(#13#10 + 'Records Missing FaceGeom File: ' + IntToStr(missingFaceGeomCount));
-  for i := 0 to missingFaceGeomRecordID.Count - 1 do
-    AddMessage(missingFaceGeomRecordID[i]);
+  for i := 0 to slMissingFaceGeomRecordID.Count - 1 do
+    AddMessage(slMissingFaceGeomRecordID[i]);
     
   AddMessage(#13#10 + 'Records Missing FaceTint File: ' + IntToStr(missingFaceTintCount));
-  for i := 0 to missingFaceTintRecordID.Count - 1 do
-    AddMessage(missingFaceTintRecordID[i]);
+  for i := 0 to slMissingFaceTintRecordID.Count - 1 do
+    AddMessage(slMissingFaceTintRecordID[i]);
     
   AddMessage(#13#10 + '------------------------------PreProcessing Summary End------------------------------');
   
-  missingFaceGeomRecordID.Free;
-  missingFaceTintRecordID.Free;
-  missingFaceGenBothRecordID.Free;
+  slMissingFaceGeomRecordID.Free;
+  slMissingFaceTintRecordID.Free;
+  slMissingFaceGenBothRecordID.Free;
 end;
 
 function RunPreProcInitialize: integer;
