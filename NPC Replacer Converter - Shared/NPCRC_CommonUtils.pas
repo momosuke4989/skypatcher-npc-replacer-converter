@@ -19,6 +19,43 @@ begin
   Result := (value = 'true') or (value = '1') or (value = 'yes');
 end;
 
+function CreateSLValueFromRecordID(const formID, editorID: string): string;
+begin
+  Result := 'FormID=' + formID + ';EditorID=' + editorID + ';';
+end;
+
+function CreateSLValueFromRecordIDWithName(const formID, editorID, npcName: string): string;
+begin
+  Result := 'FormID=' + formID + ';EditorID=' + editorID + ';Name=' + npcName + ';';
+end;
+
+function ExtractStringListValue(const valueString: string; const key: string): string;
+var
+  searchStr: string;
+  startPos, endPos: Integer;
+begin
+  Result := '';
+  
+  // "Key="形式で検索
+  searchStr := key + '=';
+  startPos := Pos(searchStr, valueString);
+  
+  if startPos = 0 then Exit;
+  
+  // 値の開始位置
+  startPos := startPos + Length(searchStr);
+  
+  // 次の;を探す（値の終わり）
+  endPos := Pos(';', Copy(valueString, startPos, Length(valueString)));
+  
+  if endPos > 0 then
+    // ;が見つかった場合、そこまでを取得
+    Result := Copy(valueString, startPos, endPos - 1)
+  else
+    // ;が見つからない場合、最後まで取得
+    Result := Copy(valueString, startPos, Length(valueString));
+end;
+
 function ShowCheckboxForm(const options, disableOpts: TStringList; caption: string): Boolean;
 var
   form: TForm;
