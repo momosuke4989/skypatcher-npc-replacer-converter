@@ -27,7 +27,7 @@
      - Dependent on standard xEdit functions; no external libraries required.
 
    Author:mmsk4989
-   Version: 2.2.0
+   Version: 2.3.0
    Last Updated: [2025-11-21]
   ==============================================================================
 }
@@ -332,6 +332,34 @@ begin
     nif.Free;    
 end;
 
+procedure DisplayMissingFaceGenRecordID(const slMissingFaceGenRecordIDs: TStringList);
+var
+  currentFileName, displayedFileName: string;
+  i: integer;
+begin
+  if slMissingFaceGenRecordIDs.Count < 1 then
+    Exit;
+    
+  currentFileName := '';
+  displayedFileName := '';
+  for i := 0 to slMissingFaceGenRecordIDs.Count - 1 do begin
+    currentFileName := ExtractStringListValue(slMissingFaceGenRecordIDs.ValueFromIndex[i], 'FileName');
+    // 表示済みのファイル名と現在のファイル名を比較して、未表示ならファイル名と見出しを表示、表示済みファイルを更新する。
+    if displayedFileName <> currentFileName then begin
+      AddMessage('-------------------------------------------------------------------------------------');
+      AddMessage('| ' + currentFileName );
+      AddMessage('-------------------------------------------------------------------------------------');
+      AddMessage('| FormID   | EditorID');
+      AddMessage('-------------------------------------------------------------------------------------');
+      displayedFileName := currentFileName;
+    end;
+    AddMessage('| ' + ExtractStringListValue(slMissingFaceGenRecordIDs.ValueFromIndex[i], 'FormID') + ' | ' +
+               slMissingFaceGenRecordIDs.Names[i]
+               );
+  end;
+  AddMessage('-------------------------------------------------------------------------------------');
+end;
+
 function DoInitialize: integer;
 var
   validInput : boolean;
@@ -573,12 +601,12 @@ begin
       AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
       Inc(useTraitsCount);
-      slMissingFaceGenWithUseTraits.Add(recordFileName + '=' + CreateSLValueFromRecordIDWithName(oldFormID,oldEditorID,oldNPCName));
+      slMissingFaceGenWithUseTraits.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
     end
     else begin
       AddMessage('This record (' + recordID + ') should have FaceGen files, but none were found.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-      slMissingFaceGenBothRecordID.Add(recordFileName + '=' + CreateSLValueFromRecordIDWithName(oldFormID,oldEditorID,oldNPCName));
+      slMissingFaceGenBothRecordID.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
       Exit;
     end;
   end
@@ -587,7 +615,7 @@ begin
     AddMessage('FaceGeom file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceGeomCount);
-    slMissingFaceGeomRecordID.Add(recordFileName + '=' + CreateSLValueFromRecordIDWithName(oldFormID,oldEditorID,oldNPCName));
+    slMissingFaceGeomRecordID.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
     Exit;
   end
   else if not missingFacegeom and missingFacetint then begin
@@ -595,7 +623,7 @@ begin
     AddMessage('FaceTint file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceTintCount);
-    slMissingFaceTintRecordID.Add(recordFileName + '=' + CreateSLValueFromRecordIDWithName(oldFormID,oldEditorID,oldNPCName));
+    slMissingFaceTintRecordID.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
     Exit;
   end;
   
@@ -638,74 +666,31 @@ begin
 end;
 
 function DoFinalize: integer;
-var
-  i: integer;
-  displayedFileName: string;
 begin
-  
   AddMessage('--------------------------------PreProcessing Summary--------------------------------');
   AddMessage('Total Records Processed: ' + IntToStr(recordCount));
   AddMessage('Total Records with Missing FaceGen Files: ' + IntToStr(missingFaceGenBothCount + missingFaceGeomCount + missingFaceTintCount));
   AddMessage('Total Removed Records: ' + IntToStr(removedRecordCount));
   
   AddMessage(#13#10 + 'Records Missing Both FaceGen Files: ' + IntToStr(missingFaceGenBothCount));
-  displayedFileName := '';
-  for i := 0 to slMissingFaceGenBothRecordID.Count - 1 do begin
-    if displayedFileName <> slMissingFaceGenBothRecordID.Names[i] then begin
-      AddMessage(slMissingFaceGenBothRecordID.Names[i]);
-      displayedFileName := slMissingFaceGenBothRecordID.Names[i];
-    end;
-    AddMessage(ExtractStringListValue(slMissingFaceGenBothRecordID.ValueFromIndex[i], 'FormID') + ' | ' +
-               ExtractStringListValue(slMissingFaceGenBothRecordID.ValueFromIndex[i], 'EditorID') + ' | ' +
-               ExtractStringListValue(slMissingFaceGenBothRecordID.ValueFromIndex[i], 'Name')
-               );
-  end;
+  DisplayMissingFaceGenRecordID(slMissingFaceGenBothRecordID);
   
-  AddMessage('with UseTraits Flag: ' + IntToStr(useTraitsCount));
-  displayedFileName := '';
-  for i := 0 to slMissingFaceGenWithUseTraits.Count - 1 do begin
-    if displayedFileName <> slMissingFaceGenWithUseTraits.Names[i] then begin
-      AddMessage(slMissingFaceGenWithUseTraits.Names[i]);
-      displayedFileName := slMissingFaceGenWithUseTraits.Names[i];
-    end;
-    AddMessage(ExtractStringListValue(slMissingFaceGenWithUseTraits.ValueFromIndex[i], 'FormID') + ' | ' +
-               ExtractStringListValue(slMissingFaceGenWithUseTraits.ValueFromIndex[i], 'EditorID') + ' | ' +
-               ExtractStringListValue(slMissingFaceGenWithUseTraits.ValueFromIndex[i], 'Name')
-               );
-  end;
+  AddMessage(#13#10 + 'with UseTraits Flag: ' + IntToStr(useTraitsCount));
+  DisplayMissingFaceGenRecordID(slMissingFaceGenWithUseTraits);
   
   AddMessage(#13#10 + 'Records Missing FaceGeom File: ' + IntToStr(missingFaceGeomCount));
-  displayedFileName := '';
-  for i := 0 to slMissingFaceGeomRecordID.Count - 1 do begin
-    if displayedFileName <> slMissingFaceGeomRecordID.Names[i] then begin
-      AddMessage(slMissingFaceGeomRecordID.Names[i]);
-      displayedFileName := slMissingFaceGeomRecordID.Names[i];
-    end;
-    AddMessage(ExtractStringListValue(slMissingFaceGeomRecordID.ValueFromIndex[i], 'FormID') + ' | ' +
-               ExtractStringListValue(slMissingFaceGeomRecordID.ValueFromIndex[i], 'EditorID') + ' | ' +
-               ExtractStringListValue(slMissingFaceGeomRecordID.ValueFromIndex[i], 'Name')
-               );
-  end;
+  DisplayMissingFaceGenRecordID(slMissingFaceGeomRecordID);
     
   AddMessage(#13#10 + 'Records Missing FaceTint File: ' + IntToStr(missingFaceTintCount));
-  displayedFileName := '';
-  for i := 0 to slMissingFaceTintRecordID.Count - 1 do begin
-    if displayedFileName <> slMissingFaceTintRecordID.Names[i] then begin
-      AddMessage(slMissingFaceTintRecordID.Names[i]);
-      displayedFileName := slMissingFaceTintRecordID.Names[i];
-    end;
-    AddMessage(ExtractStringListValue(slMissingFaceTintRecordID.ValueFromIndex[i], 'FormID') + ' | ' +
-               ExtractStringListValue(slMissingFaceTintRecordID.ValueFromIndex[i], 'EditorID') + ' | ' +
-               ExtractStringListValue(slMissingFaceTintRecordID.ValueFromIndex[i], 'Name')
-               );
-  end;
-    
+  DisplayMissingFaceGenRecordID(slMissingFaceTintRecordID);
+  
   AddMessage(#13#10 + '------------------------------PreProcessing Summary End------------------------------');
   
-  slMissingFaceGeomRecordID.Free;
-  slMissingFaceTintRecordID.Free;
   slMissingFaceGenBothRecordID.Free;
   slMissingFaceGenWithUseTraits.Free;
+  slMissingFaceGeomRecordID.Free;
+  slMissingFaceTintRecordID.Free;
+
 end;
 
 function RunPreProcInitialize: integer;

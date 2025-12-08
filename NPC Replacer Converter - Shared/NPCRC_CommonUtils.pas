@@ -8,6 +8,8 @@ function FormIDInputValidation(const s: string): Boolean;
 function EditorIDInputValidation(const s: string; useUnderScore: boolean): Boolean;
 function RemoveLeadingZeros(const s: string): string;
 function FindRecordByRecordID(const recordID, signature: string; useFormID: boolean): IwbMainRecord;
+function CreateSLValueFromRecordID(const editorID, formID, fileName: string): string;
+function ExtractStringListValue(const valueString: string; const key: string): string;
 
 implementation
 
@@ -19,14 +21,11 @@ begin
   Result := (value = 'true') or (value = '1') or (value = 'yes');
 end;
 
-function CreateSLValueFromRecordID(const formID, editorID: string): string;
+function CreateSLValueFromRecordID(const editorID, formID, fileName: string): string;
 begin
-  Result := 'FormID=' + formID + ';EditorID=' + editorID + ';';
-end;
-
-function CreateSLValueFromRecordIDWithName(const formID, editorID, npcName: string): string;
-begin
-  Result := 'FormID=' + formID + ';EditorID=' + editorID + ';Name=' + npcName + ';';
+  // EditorIDをName、FormIDとFileNameをValueとして登録
+  // 各値の読み出しはExtractStringListValue関数を利用する
+  Result := editorID + '=FormID=' + formID + ';FileName=' + fileName;
 end;
 
 function ExtractStringListValue(const valueString: string; const key: string): string;
