@@ -282,7 +282,9 @@ begin
   useTraits := GetElementNativeValues(templateFlags, 'Use Traits') <> 0;
   
   if useTraits then begin
+    AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     AddMessage('This NPC Record has Use Traits Template Flag. Config generation will be skipped.');
+    AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Exit;
   end;
   
