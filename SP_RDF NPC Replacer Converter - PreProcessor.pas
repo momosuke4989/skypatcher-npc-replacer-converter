@@ -263,15 +263,16 @@ end;
 
 procedure ReplaceFaceTintPath(faceMeshPath, faceTextureFullPath: string);
 var
-    nif              : TwbNifFile;
-    block            : TwbNifBlock;
-    element          : TdfElement;
-    lTextureList     : TList;
-    i, j, p          : Integer;
-    key,
-    newFaceTintPath  : string;
-    findFaceTintPath : boolean;
+  nif              : TwbNifFile;
+  block            : TwbNifBlock;
+  element          : TdfElement;
+  lTextureList     : TList;
+  i, j, p          : Integer;
+  key,
+  oldFaceTintPath, newFaceTintPath  : string;
+  findFaceTintPath : boolean;
 begin
+  try
     nif := TwbNifFile.Create;
     nif.LoadFromFile(faceMeshPath);
     
@@ -291,13 +292,10 @@ begin
     end;
     
     //AddMessage(Format('Found %d elements.', [Elements.Count]));
-
+    
     // Skip to the next file If nothing was found.
-    if lTextureList.Count = 0 then begin
-      lTextureList.Free;
-      nif.Free;
+    if lTextureList.Count = 0 then
       Exit;
-    end;
     
     // Do text replacement in collected elements.
     for i := 0 to lTextureList.Count - 1 do begin
@@ -309,8 +307,9 @@ begin
       if element.EditValue = '' then
         continue;
         
-      if Pos('FaceTint', element.EditValue) > 0 then begin
+      if Pos(LowerCase('FaceTint'), LowerCase(element.EditValue)) > 0 then begin
         findFaceTintPath := true;
+        oldFaceTintPath := element.EditValue;
         break;
       end;
     end;
@@ -327,12 +326,15 @@ begin
     element.EditValue := newFaceTintPath;
 
     element.Root.SaveToFile(faceMeshPath);
-
+    AddMessage('Change FaceTint Path: ' + oldFaceTintPath + ' -> ' + newFaceTintPath);
+  finally
     lTextureList.Free;
-    nif.Free;    
+    nif.Free;
+  end;
 end;
 
-procedure DisplayMissingFaceGenRecordID(const slMissingFaceGenRecordIDs: TStringList);
+{
+procedure DisplayMissingFaceGenRecordIDLegacy(const slMissingFaceGenRecordIDs: TStringList);
 var
   currentFileName, displayedFileName: string;
   i: integer;
@@ -359,6 +361,31 @@ begin
   end;
   AddMessage('-------------------------------------------------------------------------------------');
 end;
+}
+procedure DisplayMissingFaceGenRecordID(const slMissing: TStringList);
+var
+  currentFile, lastFile: string;
+  i: integer;
+begin
+  lastFile := '';
+
+  for i := 0 to slMissing.Count - 1 do begin
+    currentFile := ExtractStringListValue(slMissing.ValueFromIndex[i], 'FileName');
+
+    // ファイル名が変わったら見出しを出す
+    if currentFile <> lastFile then begin
+      AddMessage('');
+      AddMessage('[' + currentFile + ']');
+      lastFile := currentFile;
+    end;
+
+    AddMessage('  ' +
+      ExtractStringListValue(slMissing.ValueFromIndex[i], 'FormID') + '  ' +
+      slMissing.Names[i]
+    );
+  end;
+end;
+
 
 function DoInitialize: integer;
 var
