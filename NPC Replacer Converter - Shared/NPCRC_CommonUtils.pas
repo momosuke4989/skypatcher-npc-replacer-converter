@@ -9,6 +9,7 @@ function EditorIDInputValidation(const s: string; useUnderScore: boolean): Boole
 function RemoveLeadingZeros(const s: string): string;
 function FindRecordByRecordID(const recordID, signature: string; useFormID: boolean): IwbMainRecord;
 function CreateSLValueFromRecordID(const editorID, formID, fileName: string): string;
+function CreateSLValueFromRecordIDWithName(const editorID, formID, fileName, NPCName: string): string;
 function ExtractStringListValue(const valueString: string; const key: string): string;
 
 implementation
@@ -26,6 +27,13 @@ begin
   // EditorIDをName、FormIDとFileNameをValueとして登録
   // 各値の読み出しはExtractStringListValue関数を利用する
   Result := editorID + '=FormID=' + formID + ';FileName=' + fileName;
+end;
+
+function CreateSLValueFromRecordIDWithName(const editorID, formID, fileName, NPCName: string): string;
+begin
+  // EditorIDをName、FormIDとFileNameをValueとして登録
+  // 各値の読み出しはExtractStringListValue関数を利用する
+  Result := editorID + '=FormID=' + formID + ';FileName=' + fileName + ';NPCName=' + NPCName;
 end;
 
 function ExtractStringListValue(const valueString: string; const key: string): string;

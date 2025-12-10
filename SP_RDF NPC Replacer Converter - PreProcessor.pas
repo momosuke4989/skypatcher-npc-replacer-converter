@@ -266,6 +266,7 @@ var
   nif              : TwbNifFile;
   block            : TwbNifBlock;
   element          : TdfElement;
+  faceTintElement  : TdfElement;
   lTextureList     : TList;
   i, j, p          : Integer;
   key,
@@ -309,6 +310,7 @@ begin
         
       if Pos(LowerCase('FaceTint'), LowerCase(element.EditValue)) > 0 then begin
         findFaceTintPath := true;
+        faceTintElement := element;
         oldFaceTintPath := element.EditValue;
         break;
       end;
@@ -323,9 +325,9 @@ begin
     key := 'textures\actors\character\FaceGenData\FaceTint\';
     p := Pos(LowerCase(key), LowerCase(faceTextureFullPath));
     newFaceTintPath := Copy(faceTextureFullPath, p, Length(faceTextureFullPath) - p + 1);
-    element.EditValue := newFaceTintPath;
+    faceTintElement.EditValue := newFaceTintPath;
 
-    element.Root.SaveToFile(faceMeshPath);
+    faceTintElement.Root.SaveToFile(faceMeshPath);
     AddMessage('Change FaceTint Path: ' + oldFaceTintPath + ' -> ' + newFaceTintPath);
   finally
     lTextureList.Free;
@@ -333,38 +335,10 @@ begin
   end;
 end;
 
-{
-procedure DisplayMissingFaceGenRecordIDLegacy(const slMissingFaceGenRecordIDs: TStringList);
-var
-  currentFileName, displayedFileName: string;
-  i: integer;
-begin
-  if slMissingFaceGenRecordIDs.Count < 1 then
-    Exit;
-    
-  currentFileName := '';
-  displayedFileName := '';
-  for i := 0 to slMissingFaceGenRecordIDs.Count - 1 do begin
-    currentFileName := ExtractStringListValue(slMissingFaceGenRecordIDs.ValueFromIndex[i], 'FileName');
-    // 表示済みのファイル名と現在のファイル名を比較して、未表示ならファイル名と見出しを表示、表示済みファイルを更新する。
-    if displayedFileName <> currentFileName then begin
-      AddMessage('-------------------------------------------------------------------------------------');
-      AddMessage('| ' + currentFileName );
-      AddMessage('-------------------------------------------------------------------------------------');
-      AddMessage('| FormID   | EditorID');
-      AddMessage('-------------------------------------------------------------------------------------');
-      displayedFileName := currentFileName;
-    end;
-    AddMessage('| ' + ExtractStringListValue(slMissingFaceGenRecordIDs.ValueFromIndex[i], 'FormID') + ' | ' +
-               slMissingFaceGenRecordIDs.Names[i]
-               );
-  end;
-  AddMessage('-------------------------------------------------------------------------------------');
-end;
-}
 procedure DisplayMissingFaceGenRecordID(const slMissing: TStringList);
 var
   currentFile, lastFile: string;
+  displayNPCName: string;
   i: integer;
 begin
   lastFile := '';
@@ -378,10 +352,17 @@ begin
       AddMessage('[' + currentFile + ']');
       lastFile := currentFile;
     end;
+    
+    // NPCの名前がない場合は(NONE)を表示
+    if ExtractStringListValue(slMissing.ValueFromIndex[i], 'NPCName') = '' then
+      displayNPCName := '(NONE)'
+    else
+      displayNPCName := ExtractStringListValue(slMissing.ValueFromIndex[i], 'NPCName');
 
     AddMessage('  ' +
-      ExtractStringListValue(slMissing.ValueFromIndex[i], 'FormID') + '  ' +
-      slMissing.Names[i]
+      ExtractStringListValue(slMissing.ValueFromIndex[i], 'FormID') + ' | ' +
+      slMissing.Names[i] + ' | ' +
+      displayNPCName
     );
   end;
 end;
@@ -496,7 +477,7 @@ var
   recordFlag, compareStrRslt: Cardinal;
   eslFlag, useTraitsFlag,
   missingFacegeom, missingFacetint: boolean;
-  oldNPCName,
+  NPCName,
   oldFormID, newFormID,
   oldEditorID, newEditorID,
   recordID, recordFileName: string; // レコードID関連
@@ -581,7 +562,7 @@ begin
   // コピー元のFormID,EditorID,FaceGenファイルのパスを取得
   oldFormID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
   oldEditorID := GetElementEditValues(e, 'EDID');
-  oldNPCName := GetElementEditValues(e, 'FULL');
+  NPCName := GetElementEditValues(e, 'FULL');
 
   oldMeshPath := GetFaceGenPath(baseFileName, oldFormID, false, MESHMODE);
 //    AddMessage('oldMeshPath:' + oldMeshPath);
@@ -628,12 +609,12 @@ begin
       AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
       Inc(useTraitsCount);
-      slMissingFaceGenWithUseTraits.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
+      slMissingFaceGenWithUseTraits.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
     end
     else begin
       AddMessage('This record (' + recordID + ') should have FaceGen files, but none were found.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-      slMissingFaceGenBothRecordID.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
+      slMissingFaceGenBothRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
       Exit;
     end;
   end
@@ -642,7 +623,7 @@ begin
     AddMessage('FaceGeom file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceGeomCount);
-    slMissingFaceGeomRecordID.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
+    slMissingFaceGeomRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
     Exit;
   end
   else if not missingFacegeom and missingFacetint then begin
@@ -650,7 +631,7 @@ begin
     AddMessage('FaceTint file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceTintCount);
-    slMissingFaceTintRecordID.Add(CreateSLValueFromRecordID(oldEditorID, oldFormID, recordFileName));
+    slMissingFaceTintRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
     Exit;
   end;
   
