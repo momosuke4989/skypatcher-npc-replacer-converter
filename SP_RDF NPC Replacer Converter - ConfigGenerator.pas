@@ -41,6 +41,7 @@
      - Changed Force Replace XXX option behavior:
        When OFF: Do not output the setting line
        When ON: Output the setting line with comparison logic (same as before)
+     - Added Outfit setting output option
   ==============================================================================
 }
 
@@ -164,6 +165,7 @@ begin
       disableOpts.Add('Output Gender setting');
       disableOpts.Add('Output Name setting');
       disableOpts.Add('Output VoiceType setting');
+      disableOpts.Add('Output Outfit setting');
     end;
 
     if ShowCheckboxForm(opts, disableOpts, checkBoxCaption) then
