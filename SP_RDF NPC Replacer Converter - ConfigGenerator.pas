@@ -60,8 +60,8 @@ var
   // イニシャル処理で設定・使用する変数
   callPreProcessor, useSkyPatcher, useFormID, disableAll, replaceVS, replaceSkin: boolean;
 
-  // Force Replace フラグ - ONの場合のみ該当の設定行を出力する
-  outputRace, outputGender, outputName, outputVoiceType: boolean;
+  // Output setting フラグ - ONの場合のみ該当の設定行を出力する
+  outputRace, outputGender, outputName, outputVoiceType, outputOutfit: boolean;
 
 function GenerateVisualStyleString(const targetID, replacerID: string; useSkyPatcher: boolean): string;
 begin
@@ -91,12 +91,12 @@ begin
   replaceVS           := false;
   replaceSkin         := false;
 
-  // Force Replace オプションのデフォルト値を設定
+  // Output setting オプションのデフォルト値を設定
   outputRace          := false;
   outputGender        := false;
   outputName          := false;
   outputVoiceType     := false;
-
+  outputOutfit        := false;
   opts                := TStringList.Create;
   disableOpts         := TStringList.Create;
 
@@ -132,6 +132,7 @@ begin
   slCommentOut.Values['Gender']    := '';
   slCommentOut.Values['Name']      := '';
   slCommentOut.Values['VoiceType'] := '';
+  slCommentOut.Values['Outfit']    := '';
 
   if useSkyPatcher then
     checkBoxCaption := 'Choose SkyPatcher Option'
@@ -151,7 +152,7 @@ begin
     opts.Values['Output Gender setting']              := 'False';
     opts.Values['Output Name setting']                := 'False';
     opts.Values['Output VoiceType setting']           := 'False';
-
+    opts.Values['Output Outfit setting']              := 'False';
     if useSkyPatcher then begin
       opts.Values['Replace Visual Style'] := 'True';
       opts.Values['Replace Skin']         := 'True';
@@ -192,7 +193,7 @@ begin
     outputGender    := GetBoolSLValue(opts.Values['Output Gender setting']);
     outputName      := GetBoolSLValue(opts.Values['Output Name setting']);
     outputVoiceType := GetBoolSLValue(opts.Values['Output VoiceType setting']);
-
+    outputOutfit    := GetBoolSLValue(opts.Values['Output Outfit setting']);
     // オプションの選択に応じて、設定行をコメントアウトする
     if disableAll then begin
       slCommentOut.Values['CopyVS']    := coChar;
@@ -201,6 +202,7 @@ begin
       slCommentOut.Values['Gender']    := coChar;
       slCommentOut.Values['Name']      := coChar;
       slCommentOut.Values['VoiceType'] := coChar;
+      slCommentOut.Values['Outfit']    := coChar;
     end
     else begin
       if useSkyPatcher and not replaceVS then
@@ -223,12 +225,12 @@ end;
 function Process(e: IInterface): integer;
 
 var
-  replacerFlags, templateFlags, replacerRaceElement, replacerVoiceTypeElement, targetFlags, targetRaceElement, targetVoiceTypeElement: IInterface;
-  replacerRecord, targetRecord, replacerRaceRecord, replacerVoiceTypeRecord, targetRaceRecord, targetVoiceTypeRecord: IwbMainRecord;
+  replacerFlags, templateFlags, replacerRaceElement, replacerVoiceTypeElement, replacerOutfitElement, targetFlags, targetRaceElement, targetVoiceTypeElement, targetOutfitElement: IInterface;
+  replacerRecord, targetRecord, replacerRaceRecord, replacerVoiceTypeRecord, replacerOutfitRecord, targetRaceRecord, targetVoiceTypeRecord, targetOutfitRecord: IwbMainRecord;
   replacerName, targetName: string;
   replacerFormID, underscorePos: Cardinal;
   originalTargetID, recordSignature, targetFormID, targetEditorID, replacerEditorID: string; // レコードID関連
-  trimedTargetFormID, trimedReplacerFormID, exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender, exportName, exportVoiceType: string; // SkyPatcher iniファイルの記入用
+  trimedTargetFormID, trimedReplacerFormID, exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender, exportName, exportVoiceType, exportOutfit: string; // SkyPatcher iniファイルの記入用
   useTraits: boolean;
 begin
   targetFormID    := '';
@@ -286,6 +288,8 @@ begin
   replacerName             := GetElementEditValues(replacerRecord, 'FULL');
   replacerVoiceTypeElement := ElementByPath(replacerRecord, 'VTCK');
   replacerVoiceTypeRecord  := MasterOrSelf(LinksTo(replacerVoiceTypeElement));
+  replacerOutfitElement    := ElementByPath(replacerRecord, 'DOFT');
+  replacerOutfitRecord     := MasterOrSelf(LinksTo(replacerOutfitElement));
 
   // レコードがuse traitsフラグを持っているか確認し、持っていた場合はスキップ
   templateFlags := ElementByPath(replacerFlags, 'Template Flags');
@@ -305,6 +309,8 @@ begin
   targetName             := GetElementEditValues(targetRecord, 'FULL');
   targetVoiceTypeElement := ElementByPath(targetRecord, 'VTCK');
   targetVoiceTypeRecord  := MasterOrSelf(LinksTo(targetVoiceTypeElement));
+  targetOutfitElement    := ElementByPath(targetRecord, 'DOFT');
+  targetOutfitRecord     := MasterOrSelf(LinksTo(targetOutfitElement));
 
   // 各設定行の出力が有効かつdisableAllがOFFの場合のみ、比較判定を行う
   // disableAllがONの場合は、Initializeで既に全てコメントアウトに設定済みなので何もしない
@@ -337,6 +343,13 @@ begin
       if GetElementNativeValues(replacerVoiceTypeRecord, 'Record Header\FormID') = GetElementNativeValues(targetVoiceTypeRecord, 'Record Header\FormID') then
         slCommentOut.Values['VoiceType'] := coChar;
     end;
+
+    if outputOutfit then begin
+      slCommentOut.Values['Outfit'] := '';
+      // 出力が同じ場合はコメントアウト
+      if GetElementNativeValues(replacerOutfitRecord, 'Record Header\FormID') = GetElementNativeValues(targetOutfitRecord, 'Record Header\FormID') then
+        slCommentOut.Values['Outfit'] := coChar;
+    end;
   end;
 
   // 出力ファイル用の配列操作
@@ -362,12 +375,14 @@ begin
 
     exportRace  := GetFileName(replacerRaceRecord) + '|' + IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1);
     exportVoiceType := GetFileName(replacerVoiceTypeRecord) + '|' + IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1);
+    exportOutfit := GetFileName(replacerOutfitRecord) + '|' + IntToHex(FormID(replacerOutfitRecord) and  $FFFFFF, 1);
   end
   else begin
     exportTargetID := targetEditorID;
     exportReplacerID := replacerEditorID;
     exportRace  := EditorID(replacerRaceRecord);
     exportVoiceType := EditorID(replacerVoiceTypeRecord);
+    exportOutfit := EditorID(replacerOutfitRecord);
   end;
 
   // NPCレコードのWNAMフィールドが設定されていたらWNAMのスキンを反映。
@@ -407,6 +422,9 @@ begin
 
     if outputVoiceType then
       slExport.Add(slCommentOut.Values['VoiceType'] + 'filterByNpcs=' + exportTargetID + ':voiceType=' + exportVoiceType);
+
+    if outputOutfit then
+      slExport.Add(slCommentOut.Values['Outfit'] + 'filterByNpcs=' + exportTargetID + ':outfitDefault=' + exportOutfit);
   end;
 
   slExport.Add(#13#10);

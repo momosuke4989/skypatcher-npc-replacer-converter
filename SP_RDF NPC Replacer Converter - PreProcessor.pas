@@ -27,8 +27,8 @@
      - Dependent on standard xEdit functions; no external libraries required.
 
    Author:mmsk4989
-   Version: 2.3.0
-   Last Updated: [2025-11-21]
+   Version: 2.2.1
+   Last Updated: [2026-03-01]
   ==============================================================================
 }
 
@@ -67,12 +67,12 @@ var
   // イニシャル処理で設定・使用する変数
   prefix: string;
   removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
-  
+
   // サマリー用変数
   recordCount, missingFaceGeomCount,
   missingFaceTintCount, missingFaceGenBothCount,
   useTraitsCount, removedRecordCount: integer;
-  
+
   slMissingFaceGeomRecordID,
   slMissingFaceTintRecordID,
   slMissingFaceGenBothRecordID,
@@ -142,7 +142,7 @@ var
 begin
   count := 0;
   group := GroupBySignature(aFile, 'NPC_');
-  
+
   // グループが存在する場合
   if Assigned(group) then begin
     // グループ内のレコード数を取得
@@ -153,7 +153,7 @@ begin
         Inc(count);
     end;
   end;
-  
+
   Result := count;
 end;
 
@@ -178,11 +178,11 @@ begin
   // 次に使用される Form ID の取得
   nextObjectID := GetElementNativeValues(ElementByIndex(f, 0), 'HEDR\Next Object ID');
   AddMessage('Next Object ID:' + IntToHex(nextObjectID and $FFFFFF, 1));
-  
+
   // NPCレコードの数を取得
   npcRecordNum := GetNPCRecordCount(f);
   AddMessage('NPC Records:' + IntToStr(npcRecordNum));
-  
+
   // ヘッダーバージョンに応じて変化する値の設定
   if headerVer < EXTESLVER then begin
     // レコード最大数を設定
@@ -190,7 +190,7 @@ begin
     // 使用済みForm IDの数を設定
     if (nextObjectID >= ESLSTARTFORMID) and (nextObjectID <= ESLMAXFORMID) then
       numUsedFormID := nextObjectID - ESLSTARTFORMID
-    else 
+    else
       numUsedFormID := nextObjectID;
   end
   else begin
@@ -204,13 +204,13 @@ begin
     else
       numUsedFormID := nextObjectID;
   end;
-  
+
   AddMessage('Max Record Count:' + IntToStr(maxRecordNum));
-  
+
   // 利用可能なForm ID数の予想値を計算
   estRemainingFormID := maxRecordNum - numUsedFormID;
   AddMessage('Estimate Remaining Form IDs:' + IntToStr(estRemainingFormID));
-  
+
   // Next Object IDが制限範囲を超えていないか判定
   if headerVer < EXTESLVER then begin
     if (nextObjectID < ESLSTARTFORMID) or (nextObjectID > ESLMAXFORMID) then
@@ -220,7 +220,7 @@ begin
     if nextObjectID > ESLMAXFORMID then
       invalidObjectID := true;
   end;
-    
+
 
 
   // Form IDの判定
@@ -235,7 +235,7 @@ begin
     Result := true;
     Exit;
   end;
-  
+
   // Form IDの空きスペースが足りない
   if (estRemainingFormID > 0) and (npcRecordNum > estRemainingFormID) then begin
     AddMessage('Script aborted: Not enough Form ID space.');
@@ -247,7 +247,7 @@ begin
     Result := true;
     Exit;
   end;
-  
+
   // レコード数が上限以上
   if recordNum >= maxRecordNum then begin
     AddMessage('Script aborted: Too many records.');
@@ -276,38 +276,38 @@ begin
   try
     nif := TwbNifFile.Create;
     nif.LoadFromFile(faceMeshPath);
-    
+
     findFaceTintPath := false;
-    
+
     lTextureList := TList.Create;
-    
+
     // Iterate over all blocks in a nif file and locate elements holding textures.
     for i := 0 to nif.BlocksCount - 1 do begin
         block := nif.Blocks[i];
-        
+
         if block.BlockType = 'BSShaderTextureSet' then begin
             element := block.Elements['Textures'];
             for j := 0 to element.Count - 1 do
                 lTextureList.Add(element[j]);
-        end; 
+        end;
     end;
-    
+
     //AddMessage(Format('Found %d elements.', [Elements.Count]));
-    
+
     // Skip to the next file If nothing was found.
     if lTextureList.Count = 0 then
       Exit;
-    
+
     // Do text replacement in collected elements.
     for i := 0 to lTextureList.Count - 1 do begin
       if not Assigned(lTextureList[i]) then
         continue;
 
       element := TdfElement(lTextureList[i]);
-      
+
       if element.EditValue = '' then
         continue;
-        
+
       if Pos(LowerCase('FaceTint'), LowerCase(element.EditValue)) > 0 then begin
         findFaceTintPath := true;
         faceTintElement := element;
@@ -315,12 +315,12 @@ begin
         break;
       end;
     end;
-    
+
     if not findFaceTintPath then begin
       AddMessage('FaceTint file path not found.');
       Exit;
     end;
-    
+
     // 新しいFaceTintパスをnifファイルに設定
     key := 'textures\actors\character\FaceGenData\FaceTint\';
     p := Pos(LowerCase(key), LowerCase(faceTextureFullPath));
@@ -352,7 +352,7 @@ begin
       AddMessage('[' + currentFile + ']');
       lastFile := currentFile;
     end;
-    
+
     // NPCの名前がない場合は(NONE)を表示
     if ExtractStringListValue(slMissing.ValueFromIndex[i], 'NPCName') = '' then
       displayNPCName := '(NONE)'
@@ -385,24 +385,24 @@ begin
   removeFaceGenMissingRec   := false;
   isInputProvided     := false;
   validInput          := false;
-  
+
   recordCount                 := 0;
   missingFaceGeomCount        := 0;
   missingFaceTintCount        := 0;
   missingFaceGenBothCount     := 0;
   useTraitsCount              := 0;
   removedRecordCount          := 0;
-  
+
   slMissingFaceGeomRecordID     := TStringList.Create;
   slMissingFaceTintRecordID     := TStringList.Create;
   slMissingFaceGenBothRecordID  := TStringList.Create;
   slMissingFaceGenWithUseTraits := TStringList.Create;
-  
+
   slOpts                := TStringList.Create;
   slDisableOpts         := TStringList.Create;
-  
+
   checkBoxCaption             := 'Choose PreProcessor Option';
-  
+
   Result              := 0;
 
 
@@ -423,14 +423,14 @@ begin
       Result := -1;
       Exit;
     end;
-    
+
 
     // コピー元のFaceGenファイルを残すか
     removeFaceGen := GetBoolSLValue(slOpts.Values['Remove FaceGen files in the replacer mod']);
-    
+
     // FaceGenファイルを持たないNPCレコードをコピーするか
     removeFaceGenMissingRec := GetBoolSLValue(slOpts.Values['Remove NPC records without FaceGen files']);
-      
+
   finally
     slOpts.Free;
     slDisableOpts.Free;
@@ -461,7 +461,7 @@ begin
         validInput := false;
       end;
     end;
-      
+
     if validInput = false then
       prefix := '';
 
@@ -528,10 +528,10 @@ begin
   // Mod名を取得（レコードが所属するファイル名）
   replacerFileName := GetFileName(GetFile(e));
   baseFileName := GetFileName(GetFile(MasterOrSelf(e)));
-  
+
   //AddMessage('firstRecordFileName:' + firstRecordFileName);
   //AddMessage('Now plugin name:' + replacerFileName);
-  
+
   // 最初のレコードが所属するプラグインと異なるプラグインが選択されていたらスキップ
   compareStrRslt := CompareStr(firstRecordFileName, replacerFileName);
   //AddMessage('Set compareStrRslt:' + IntToStr(compareStrRslt));
@@ -551,9 +551,9 @@ begin
     AddMessage(GetElementEditValues(e, 'EDID') + ' does not overwrite other record.');
     Exit;
   end;
-  
+
   Inc(recordCount);
-  
+
   // フラグを初期化
   missingFacegeom := false;
   missingFacetint := false;
@@ -574,7 +574,7 @@ begin
     AddMessage('File not found: ' + oldMeshPath);
     missingFacegeom := true
   end;
-  
+
   if not FileExists(oldTexturePath) then begin
     AddMessage('File not found: ' + oldTexturePath);
     missingFacetint := true;
@@ -584,11 +584,11 @@ begin
   recordFlag := GetElementNativeValues(ElementBySignature(e, 'ACBS'), 'Template Flags');
   if (recordFlag and $01) <> 0 then
     useTraitsFlag := true;
-  
+
   // レコードID,ファイル名を変数に格納
   recordID := 'Form ID: ' + oldFormID + ', Editor ID: ' + oldEditorID;
   recordFileName := GetFileName(MasterOrSelf(e));
-  
+
   // FaceGenファイルが存在しない場合の処理
   // FaceGeomかFaceTintのどちらも存在していない場合
   if missingFacegeom and missingFacetint then begin
@@ -603,7 +603,7 @@ begin
       Remove(e);
       Exit;
     end;
-    
+
     // Use Traitsフラグを持っていない場合は異常と判断し、処理をスキップ
     if useTraitsFlag then begin
       AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.');
@@ -634,8 +634,8 @@ begin
     slMissingFaceTintRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
     Exit;
   end;
-  
-  
+
+
   // レコードを複製
   newRecord := wbCopyElementToFile(e, GetFile(e), True, True);
   if not Assigned(newRecord) then begin
@@ -649,7 +649,7 @@ begin
   newEditorID := prefix + '_' + oldEditorID;
   SetElementEditValues(newRecord, 'EDID', newEditorID);
   // AddMessage('Created new record with Editor ID: ' + newEditorID);
-  
+
   // 新しいFaceGenファイルのパスを取得
   newMeshPath := GetFaceGenPath(replacerFileName, newFormID, true, MESHMODE);
 //    AddMessage('newMeshPath:' + newMeshPath);
@@ -664,10 +664,10 @@ begin
       ReplaceFaceTintPath(newMeshPath, newTexturePath);
     end;
   end;
-  
+
   if Assigned(newRecord) then
     createdRecord := newRecord;
-  
+
   // コピー元レコードを削除
   Remove(e);
 
@@ -679,21 +679,21 @@ begin
   AddMessage('Total Records Processed: ' + IntToStr(recordCount));
   AddMessage('Total Records with Missing FaceGen Files: ' + IntToStr(missingFaceGenBothCount + missingFaceGeomCount + missingFaceTintCount));
   AddMessage('Total Removed Records: ' + IntToStr(removedRecordCount));
-  
+
   AddMessage(#13#10 + 'Records Missing Both FaceGen Files: ' + IntToStr(missingFaceGenBothCount));
   DisplayMissingFaceGenRecordID(slMissingFaceGenBothRecordID);
-  
+
   AddMessage(#13#10 + 'with UseTraits Flag: ' + IntToStr(useTraitsCount));
   DisplayMissingFaceGenRecordID(slMissingFaceGenWithUseTraits);
-  
+
   AddMessage(#13#10 + 'Records Missing FaceGeom File: ' + IntToStr(missingFaceGeomCount));
   DisplayMissingFaceGenRecordID(slMissingFaceGeomRecordID);
-    
+
   AddMessage(#13#10 + 'Records Missing FaceTint File: ' + IntToStr(missingFaceTintCount));
   DisplayMissingFaceGenRecordID(slMissingFaceTintRecordID);
-  
+
   AddMessage(#13#10 + '------------------------------PreProcessing Summary End------------------------------');
-  
+
   slMissingFaceGenBothRecordID.Free;
   slMissingFaceGenWithUseTraits.Free;
   slMissingFaceGeomRecordID.Free;
