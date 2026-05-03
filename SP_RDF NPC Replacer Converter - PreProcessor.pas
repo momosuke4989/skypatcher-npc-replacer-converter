@@ -27,8 +27,14 @@
      - Dependent on standard xEdit functions; no external libraries required.
 
    Author:mmsk4989
-   Version: 2.2.1
-   Last Updated: [2026-03-01]
+   Version: 2.3.0
+   Last Updated: [2026-05-03]
+
+   Changelog:
+     - Changed Force Replace XXX option behavior:
+       When OFF: Do not output the setting line
+       When ON: Output the setting line with comparison logic (same as before)
+     - Added Outfit setting output option
   ==============================================================================
 }
 
