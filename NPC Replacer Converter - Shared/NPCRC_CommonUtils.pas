@@ -42,19 +42,19 @@ var
   startPos, endPos: Integer;
 begin
   Result := '';
-  
+
   // "Key="形式で検索
   searchStr := key + '=';
   startPos := Pos(searchStr, valueString);
-  
+
   if startPos = 0 then Exit;
-  
+
   // 値の開始位置
   startPos := startPos + Length(searchStr);
-  
+
   // 次の;を探す（値の終わり）
   endPos := Pos(';', Copy(valueString, startPos, Length(valueString)));
-  
+
   if endPos > 0 then
     // ;が見つかった場合、そこまでを取得
     Result := Copy(valueString, startPos, endPos - 1)
@@ -77,7 +77,7 @@ begin
 {  AddMessage('=== Debug Info ===');
   AddMessage('Options count: ' + IntToStr(options.Count));
   AddMessage('DisableOpts count: ' + IntToStr(disableOpts.Count));
-}  
+}
   form := TForm.Create(nil);
   try
     form.Caption := caption;
@@ -92,30 +92,30 @@ begin
 
     for i := 0 to options.Count - 1 do begin
       checklist.Items.Add(options.Names[i]);
-      
+
       shouldDisable := false;
-      
+
       // このオプションを無効化すべきか判定
       shouldDisable := (disableOpts.Count > 0) and (disableOpts.IndexOf(options.Names[i]) >= 0);
-      
+
       // デバッグ: 各項目の判定結果
 {      AddMessage('Item ' + IntToStr(i) + ': ' + options.ValueFromIndex[i]);
-      
+
       if shouldCheck then
         AddMessage('  shouldCheck: True')
       else
         AddMessage('  shouldCheck: False');
-            
+
       if shouldDisable then
         AddMessage('  shouldDisable: True')
       else
         AddMessage('  shouldDisable: False');
 }
-      
+
       // このオプションをチェックすべきか判定
       if GetBoolSLValue(options.ValueFromIndex[i]) then
         checklist.Checked[i] := true;
-      
+
       // 注意：ItemEnabledはtrue:無効化、false:有効化となる
       // 一般的な論理イメージと逆転している。
       if shouldDisable then begin
@@ -215,12 +215,13 @@ var
 begin
   i := 1;
   // 先頭の '0' をスキップ
-  while (i <= Length(s)) and (s[i] = '0') do
+  while (i <= Length(s)) and (Copy(s, i, 1) = '0') do
     Inc(i);
   // すべてが '0' の場合は '0' を返す
   if i > Length(s) then
     Result := '0'
   else
+    Result := Copy(s, i, Length(s) - i + 1);
     Result := Copy(s, i, Length(s) - i + 1);
 end;
 
@@ -233,7 +234,7 @@ var
   npcRecordGroup: IwbGroupRecord;
 begin
   Result := nil;
-  
+
   if useFormID then begin
     // StrToIntでは負数になってしまうので、StrToInt64で変換し、Cardinal型で受け取る。
     formID := StrToInt64('$' + recordID);
