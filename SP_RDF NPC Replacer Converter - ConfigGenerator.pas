@@ -56,21 +56,81 @@ const
 var
   // 設定ファイル出力用変数
   slExport, slCommentOut: TStringList;
-  coChar, targetFileName, replacerFileName: string;
+  coChar, targetFileName, replacerFileName, framework: string;
 
   // イニシャル処理で設定・使用する変数
-  callPreProcessor, useSkyPatcher, useFormID, disableAll, replaceVS, replaceSkin: boolean;
+  callPreProcessor, useFormID, disableAll, replaceVS, replaceSkin: boolean;
 
   // Output setting フラグ - ONの場合のみ該当の設定行を出力する
   outputRace, outputGender, outputName, outputVoiceType, outputOutfit: boolean;
 
-function GenerateVisualStyleString(const targetID, replacerID: string; useSkyPatcher: boolean): string;
+function GenerateVisualStyleString(const targetID, replacerID, fw: string): string;
 begin
   Result := '';
-    if useSkyPatcher then
-      Result := 'filterByNpcs=' + TargetID + ':copyVisualStyle=' + ReplacerID
-    else
-      Result := 'match=' + TargetID + ' swap=' + ReplacerID;
+  if fw = 'SkyPatcher' then
+    Result := 'filterByNpcs=' + TargetID + ':copyVisualStyle=' + ReplacerID
+  else if fw = 'Recast' then
+    Result := 'face = "' + ReplacerID + '"'
+  else
+    Result := 'match=' + TargetID + ' swap=' + ReplacerID;
+end;
+
+// フレームワーク選択（チェックボックス方式、排他制御あり）
+// 複数選択された場合はエラーを表示して再選択させる
+function SelectFramework: string;
+var
+  opts, disableOpts: TStringList;
+  skyPatcherSelected, rdfSelected, recastSelected: Boolean;
+  selectedCount: Integer;
+begin
+  Result := '';
+  opts := TStringList.Create;
+  disableOpts := TStringList.Create;
+  try
+    opts.Values['SkyPatcher'] := 'True';
+    opts.Values['RDF (Race Distribution Framework)'] := 'False';
+    opts.Values['Recast'] := 'False';
+
+    if not ShowCheckboxForm(opts, disableOpts, 'Select Framework (choose only one)') then begin
+      AddMessage('Selection was canceled.');
+      Exit;
+    end;
+
+    skyPatcherSelected := GetBoolSLValue(opts.Values['SkyPatcher']);
+    rdfSelected        := GetBoolSLValue(opts.Values['RDF (Race Distribution Framework)']);
+    recastSelected     := GetBoolSLValue(opts.Values['Recast']);
+
+    selectedCount := 0;
+    if skyPatcherSelected then Inc(selectedCount);
+    if rdfSelected then Inc(selectedCount);
+    if recastSelected then Inc(selectedCount);
+    // AddMessage('Selected Count: ' + IntToStr(selectedCount));
+
+    // 複数選択された場合はエラーを表示して再選択させる
+    if selectedCount > 1 then begin
+      MessageDlg('Please select only one framework.', mtError, [mbOK], 0);
+      Result := SelectFramework; // 再選択
+      Exit;
+    end;
+
+    // 何も選択されなかった場合もエラーを表示して再選択させる
+    if selectedCount = 0 then begin
+      MessageDlg('Please select a framework.', mtError, [mbOK], 0);
+      Result := SelectFramework; // 再選択
+      Exit;
+    end;
+
+    if skyPatcherSelected then
+      Result := 'SkyPatcher'
+    else if rdfSelected then
+      Result := 'RDF'
+    else if recastSelected then
+      Result := 'Recast';
+
+  finally
+    opts.Free;
+    disableOpts.Free;
+  end;
 end;
 
 function Initialize: integer;
@@ -85,7 +145,6 @@ begin
   coChar              := '';
 
   callPreProcessor    := false;
-  useSkyPatcher       := false;
   useFormID           := false;
 
   disableAll          := false;
@@ -112,16 +171,19 @@ begin
     ) = mrYes then
     callPreProcessor := true;
 
-  if MessageDlg(
-    'Select which config file to generate:' + #13#10 +
-    'Yes = Generate for SkyPatcher' + #13#10 +
-    'No = Generate for RDF',
-    mtConfirmation, [mbYes, mbNo], 0
-    ) = mrYes then
-    useSkyPatcher := true;
+  // フレームワーク選択（チェックボックス方式、排他制御あり）
+  framework := SelectFramework;
+  if framework = '' then begin
+    AddMessage('Framework selection was canceled.');
+    Result := -1;
+    Exit;
+  end;
 
-  // SkyPatcherかRDFの利用に応じてコメントアウト文字を切り替え
-  if useSkyPatcher then
+  AddMessage('Selected framework: ' + framework);
+
+  // フレームワークの種類に応じてコメントアウト文字を切り替え
+  // TOML形式のRecastは '#' を使用、SkyPatcherは ';' を使用
+  if framework = 'SkyPatcher' then
     coChar := ';'
   else
     coChar := '#';
@@ -135,8 +197,10 @@ begin
   slCommentOut.Values['VoiceType'] := '';
   slCommentOut.Values['Outfit']    := '';
 
-  if useSkyPatcher then
+  if framework = 'SkyPatcher' then
     checkBoxCaption := 'Choose SkyPatcher Option'
+  else if framework = 'Recast' then
+    checkBoxCaption := 'Choose Recast Option'
   else
     checkBoxCaption := 'Choose RDF Option';
 
@@ -154,11 +218,20 @@ begin
     opts.Values['Output Name setting']                := 'False';
     opts.Values['Output VoiceType setting']           := 'False';
     opts.Values['Output Outfit setting']              := 'False';
-    if useSkyPatcher then begin
+
+    if framework = 'SkyPatcher' then begin
       opts.Values['Replace Visual Style'] := 'True';
       opts.Values['Replace Skin']         := 'True';
     end
+    else if framework = 'Recast' then begin
+      opts.Values['Replace Visual Style'] := 'True';
+      opts.Values['Replace Skin']         := 'True';
+      // RecastはRaceとOutfitに未対応のため無効化
+      disableOpts.Add('Output Race setting');
+      disableOpts.Add('Output Outfit setting');
+    end
     else begin
+      // RDFはSkyPatcher専用オプションを無効化
       disableOpts.Add('Replace Visual Style');
       disableOpts.Add('Replace Skin');
       disableOpts.Add('Output Race setting');
@@ -186,7 +259,7 @@ begin
     // 出力ファイルの記述をすべてコメントアウトするか
     disableAll := GetBoolSLValue(opts.Values['Disable the config file by default']);
 
-    // SkyPatcher利用時のオプション設定
+    // SkyPatcher、Recast利用時のオプション設定
     replaceVS       := GetBoolSLValue(opts.Values['Replace Visual Style']);    // 見た目を変更するか
     replaceSkin     := GetBoolSLValue(opts.Values['Replace Skin']);            // 肌を変更するか
 
@@ -196,6 +269,7 @@ begin
     outputName      := GetBoolSLValue(opts.Values['Output Name setting']);
     outputVoiceType := GetBoolSLValue(opts.Values['Output VoiceType setting']);
     outputOutfit    := GetBoolSLValue(opts.Values['Output Outfit setting']);
+
     // オプションの選択に応じて、設定行をコメントアウトする
     if disableAll then begin
       slCommentOut.Values['CopyVS']    := coChar;
@@ -207,15 +281,16 @@ begin
       slCommentOut.Values['Outfit']    := coChar;
     end
     else begin
-      if useSkyPatcher and not replaceVS then
+      // RDF以外（SkyPatcher・Recast）はReplace Visual Style/Skinトグルに連動
+      if (framework <> 'RDF') and not replaceVS then
         slCommentOut.Values['CopyVS'] := coChar;
 
       if not replaceSkin then
         slCommentOut.Values['Skin'] := coChar;
+    end;
 
       // outputXXXがOFFの項目は、Processで比較判定を行わないため、
       // ここで初期化する必要はない（Processで出力自体がスキップされる）
-    end;
 
   finally
     opts.Free;
@@ -366,7 +441,7 @@ begin
 
     trimedReplacerFormID := IntToHex(replacerFormID and  $FFFFFF, 1);
 
-    if useSkyPatcher then begin
+    if framework = 'SkyPatcher' then begin
       exportTargetID := targetFileName + '|' + trimedTargetFormID;
       exportReplacerID := replacerFileName + '|' + trimedReplacerFormID;
     end
@@ -406,10 +481,10 @@ begin
   exportName := replacerName;
 
   slExport.Add(coChar + GetElementEditValues(targetRecord, 'FULL'));
-  slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, useSkyPatcher));
+  slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
 
   // SkyPatcher利用時のみ出力する
-  if useSkyPatcher then begin
+  if framework = 'SkyPatcher' then begin
     slExport.Add(slCommentOut.Values['Skin'] + 'filterByNpcs=' + exportTargetID + ':skin=' + exportSkinID);
 
     // 各設定行は対応するoutputフラグがONの場合のみ出力
@@ -452,7 +527,7 @@ begin
   end;
 
   // 出力設定の決定
-  if useSkyPatcher then begin
+  if framework = 'SkyPatcher' then begin
     saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\SkyPatcher\npc\SkyPatcher NPC Replacer Converter\';
     filterString := 'Ini (*.ini)|*.ini';
     fileExtension := '.ini';
