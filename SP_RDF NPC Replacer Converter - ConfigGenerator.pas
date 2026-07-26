@@ -6,32 +6,34 @@
    Description:
      This script is part of the "SkyPatcher RDF NPC Replacer Converter" toolset.
      It functions as the *Config Generator (ConfigGen)* phase, executed after
-     the PreProcessor. Its purpose is to create configuration files for either
-     **SkyPatcher** or **Race Distribution Framework (RDF)** based on user-selected
-     options and NPC record data gathered from the list of plugins currently loaded
-     in xEdit.
+     the PreProcessor. Its purpose is to create configuration files for
+     **SkyPatcher**, **Race Distribution Framework (RDF)**, or **Recast** based
+     on user-selected options and NPC record data gathered from the list of
+     plugins currently loaded in xEdit.
 
    Features:
      - Integrates seamlessly with the PreProcessor phase (optional).
-     - Prompts user to select output mode (SkyPatcher / RDF) and generation options.
+     - Prompts user to select output framework (SkyPatcher / RDF / Recast)
+       and generation options via checkboxes.
      - Scans and compares NPC records (original vs. replacer) to determine
-       which parameters (appearance, race, gender, etc.) should be replaced.
-     - Generates structured `.ini` (for SkyPatcher) or `.txt` (for RDF) config files.
+       which parameters (appearance, gender, name, etc.) should be replaced.
+     - Generates structured `.ini` (SkyPatcher), `.txt` (RDF), or `.toml` (Recast)
+       config files.
      - Automatically comments out or enables settings according to user preferences.
 
    Usage:
      1. Run this script in xEdit (SSEEdit) on your replacer plugin.
      2. Select whether to run in Integration Mode (to invoke PreProcessor).
-     3. Choose your config generation target (SkyPatcher or RDF).
+     3. Choose your config generation target (SkyPatcher / RDF / Recast).
      4. Select desired options in the checklist dialog.
-     5. The script will process NPC records and output a ready-to-use config file
-        under the `Data\SkyPatcher RDF NPC Replacer Converter\...` directory.
+     5. The script will process NPC records and output a ready-to-use config file.
 
    Notes:
-      - Intended for Skyrim SE/AE with SkyPatcher and RDF support.
+      - Intended for Skyrim SE/AE with SkyPatcher, RDF, and Recast support.
       - Uses `SP_RDF_NPCReplacerConverter_PreProcessor.pas` when Integration Mode is selected.
       - This script can also be run standalone if the PreProcessor has already been applied.
       - Compatible with both FormID- and EditorID-based reference methods.
+      - Recast does not support Race replacement or Outfit output.
 
    Author:mmsk4989
    Version: 2.3.0
@@ -56,13 +58,16 @@ const
 var
   // 設定ファイル出力用変数
   slExport, slCommentOut: TStringList;
-  coChar, targetFileName, replacerFileName, framework: string;
+  coChar, targetFileName, replacerFileName: string;
 
   // イニシャル処理で設定・使用する変数
-  callPreProcessor, useFormID, disableAll, replaceVS, replaceSkin: boolean;
+  callPreProcessor, useFormID, disableAll, replaceVS: boolean;
 
-  // Output setting フラグ - ONの場合のみ該当の設定行を出力する
-  outputRace, outputGender, outputName, outputVoiceType, outputOutfit: boolean;
+  // 選択中のフレームワーク ('SkyPatcher' / 'RDF' / 'Recast')
+  framework: string;
+
+  // Output フラグ - ONの場合のみ該当の設定行を出力する
+  outputSkin, outputRace, outputGender, outputName, outputVoiceType, outputOutfit: boolean;
 
 function GenerateVisualStyleString(const targetID, replacerID, fw: string): string;
 begin
@@ -133,6 +138,17 @@ begin
   end;
 end;
 
+procedure InsertRecastManifest;
+begin
+  if framework = 'Recast' then begin
+    slExport.Insert(0, '');
+    slExport.Insert(0, 'api_version = 1');
+    slExport.Insert(0, 'priority = 100');
+    slExport.Insert(0, 'name = "' + replacerFileName + '"');
+    slExport.Insert(0, '[manifest]');
+  end;
+end;
+
 function Initialize: integer;
 var
   validInput: boolean;
@@ -149,9 +165,9 @@ begin
 
   disableAll          := false;
   replaceVS           := false;
-  replaceSkin         := false;
 
   // Output setting オプションのデフォルト値を設定
+  outputSkin          := false;
   outputRace          := false;
   outputGender        := false;
   outputName          := false;
@@ -212,7 +228,7 @@ begin
     opts.Values['Use Form ID for config file output'] := 'False';
     opts.Values['Disable the config file by default'] := 'False';
     opts.Values['Replace Visual Style']               := 'False';
-    opts.Values['Replace Skin']                       := 'False';
+    opts.Values['Output Skin or body setting']        := 'False';
     opts.Values['Output Race setting']                := 'False';
     opts.Values['Output Gender setting']              := 'False';
     opts.Values['Output Name setting']                := 'False';
@@ -221,11 +237,11 @@ begin
 
     if framework = 'SkyPatcher' then begin
       opts.Values['Replace Visual Style'] := 'True';
-      opts.Values['Replace Skin']         := 'True';
+      opts.Values['Output Skin or body setting']         := 'True';
     end
     else if framework = 'Recast' then begin
       opts.Values['Replace Visual Style'] := 'True';
-      opts.Values['Replace Skin']         := 'True';
+      opts.Values['Output Skin or body setting']         := 'True';
       // RecastはRaceとOutfitに未対応のため無効化
       disableOpts.Add('Output Race setting');
       disableOpts.Add('Output Outfit setting');
@@ -233,7 +249,7 @@ begin
     else begin
       // RDFはSkyPatcher専用オプションを無効化
       disableOpts.Add('Replace Visual Style');
-      disableOpts.Add('Replace Skin');
+      disableOpts.Add('Output Skin or body setting');
       disableOpts.Add('Output Race setting');
       disableOpts.Add('Output Gender setting');
       disableOpts.Add('Output Name setting');
@@ -261,7 +277,7 @@ begin
 
     // SkyPatcher、Recast利用時のオプション設定
     replaceVS       := GetBoolSLValue(opts.Values['Replace Visual Style']);    // 見た目を変更するか
-    replaceSkin     := GetBoolSLValue(opts.Values['Replace Skin']);            // 肌を変更するか
+    outputSkin      := GetBoolSLValue(opts.Values['Output Skin or body setting']);            // 肌を変更するか
 
     // 各設定行を出力するかどうか（ONの場合のみ出力）
     outputRace      := GetBoolSLValue(opts.Values['Output Race setting']);
@@ -285,7 +301,7 @@ begin
       if (framework <> 'RDF') and not replaceVS then
         slCommentOut.Values['CopyVS'] := coChar;
 
-      if not replaceSkin then
+      if not outputSkin then
         slCommentOut.Values['Skin'] := coChar;
     end;
 
@@ -307,7 +323,7 @@ var
   replacerName, targetName: string;
   replacerFormID, underscorePos: Cardinal;
   originalTargetID, recordSignature, targetFormID, targetEditorID, replacerEditorID: string; // レコードID関連
-  trimedTargetFormID, trimedReplacerFormID, exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender, exportName, exportVoiceType, exportOutfit: string; // SkyPatcher iniファイルの記入用
+  trimedTargetFormID, trimedReplacerFormID, exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender, exportName, exportVoiceType, exportOutfit: string; // SkyPatcher, Recast設定ファイルの記入用
   useTraits: boolean;
 begin
   targetFormID    := '';
@@ -358,7 +374,7 @@ begin
   targetEditorID := GetElementEditValues(targetRecord, 'EDID');
     //AddMessage('Target Record Editor ID: ' + targetEditorID);
 
-  // リプレイサーNPCのフラグ、種族、名前、音声タイプを取得
+  // リプレイサーNPCのフラグ、種族、名前、音声タイプ、装備を取得
   replacerFlags            := ElementByPath(replacerRecord, 'ACBS - Configuration');
   replacerRaceElement      := ElementByPath(replacerRecord, 'RNAM');
   replacerRaceRecord       := MasterOrSelf(LinksTo(replacerRaceElement));
@@ -379,7 +395,7 @@ begin
     Exit;
   end;
 
-  // ターゲットNPCのフラグ、種族、名前、音声タイプを取得
+  // ターゲットNPCのフラグ、種族、名前、音声タイプ、装備を取得
   targetFlags            := ElementByPath(targetRecord, 'ACBS - Configuration');
   targetRaceElement      := ElementByPath(targetRecord, 'RNAM');
   targetRaceRecord       := MasterOrSelf(LinksTo(targetRaceElement));
@@ -393,6 +409,13 @@ begin
   // disableAllがONの場合は、Initializeで既に全てコメントアウトに設定済みなので何もしない
   if not disableAll then begin
     // 出力が有効な項目のみコメントアウト判定を行う
+    if outputSkin then begin
+      slCommentOut.Values['Skin'] := '';
+      // 肌が同じ場合はコメントアウト
+      if GetElementNativeValues(replacerRecord, 'WNAM') = GetElementNativeValues(targetRaceRecord, 'WNAM') then
+        slCommentOut.Values['Skin'] := coChar;
+    end;
+
     if outputRace then begin
       slCommentOut.Values['Race'] := '';
       // 種族が同じ場合はコメントアウト
@@ -444,15 +467,24 @@ begin
     if framework = 'SkyPatcher' then begin
       exportTargetID := targetFileName + '|' + trimedTargetFormID;
       exportReplacerID := replacerFileName + '|' + trimedReplacerFormID;
+      exportRace  := GetFileName(replacerRaceRecord) + '|' + IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1);
+      exportVoiceType := GetFileName(replacerVoiceTypeRecord) + '|' + IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1);
+      exportOutfit := GetFileName(replacerOutfitRecord) + '|' + IntToHex(FormID(replacerOutfitRecord) and  $FFFFFF, 1);
+    end
+    else if framework = 'Recast' then begin
+      //exportTargetID := '0x' + targetFormID + '~' + targetFileName;
+      //exportReplacerID := '0x' + replacerFormID + '~' + replacerFileName;
+      exportTargetID := trimedTargetFormID + '~' + targetFileName;
+      exportReplacerID := trimedReplacerFormID + '~' + replacerFileName;
+      exportRace  := IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1) + '~' + GetFileName(replacerRaceRecord);
+      exportVoiceType := IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1) + '~' + GetFileName(replacerVoiceTypeRecord);
+      exportOutfit := IntToHex(FormID(replacerOutfitRecord) and  $FFFFFF, 1) + '~' + GetFileName(replacerOutfitRecord);
     end
     else begin
       exportTargetID := trimedTargetFormID + '~' + targetFileName;
       exportReplacerID := trimedReplacerFormID + '~' + replacerFileName;
     end;
 
-    exportRace  := GetFileName(replacerRaceRecord) + '|' + IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1);
-    exportVoiceType := GetFileName(replacerVoiceTypeRecord) + '|' + IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1);
-    exportOutfit := GetFileName(replacerOutfitRecord) + '|' + IntToHex(FormID(replacerOutfitRecord) and  $FFFFFF, 1);
   end
   else begin
     exportTargetID := targetEditorID;
@@ -466,28 +498,48 @@ begin
   // 設定されていない場合はnullでデフォルトボディを指定。
   wnamID := IntToHex(GetElementNativeValues(replacerRecord, 'WNAM') and  $FFFFFF, 1);
   //  AddMessage('wnamID is:' + wnamID);
-  if wnamID = '0' then
-    exportSkinID := 'null'
-  else
-    exportSkinID := replacerFileName + '|' + wnamID;
+  if framework = 'SkyPatcher' then begin
+    if wnamID = '0' then
+      exportSkinID := 'null'
+    else
+      exportSkinID := wnamID;
+  end
+  else if framework = 'Recast' then begin
+    // RecastはWNAMにデフォルトボディを指定する方法がないため、未設定の場合は設定行を出力しない
+    if wnamID = '0' then
+      outputSkin := false
+    else
+      exportSkinID := wnamID + '~' + replacerFileName;
+  end;
 
   // 性別フラグを反映する文字列を入力
-  if GetElementEditValues(replacerFlags, 'Flags\Female') = 1 then
-    exportGender := ':setFlags=female'
-  else
-    exportGender := ':removeFlags=female';
+  if framework = 'SkyPatcher' then begin
+    if GetElementEditValues(replacerFlags, 'Flags\Female') = 1 then
+      exportGender := ':setFlags=female'
+    else
+      exportGender := ':removeFlags=female';
+  end
+  else if framework = 'Recast' then begin
+    if GetElementEditValues(replacerFlags, 'Flags\Female') = 1 then
+      exportGender := 'female'
+    else
+      exportGender := 'male';
+  end;
 
   // 名前を入力
   exportName := replacerName;
 
+  // 設定行の見出しとして、ターゲットNPCの名前、FormID、EditorIDを出力する
   slExport.Add(coChar + GetElementEditValues(targetRecord, 'FULL'));
-  slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
+  slExport.Add(coChar + 'Form ID: ' + targetFormID + '  Editor ID: ' + targetEditorID);
 
-  // SkyPatcher利用時のみ出力する
   if framework = 'SkyPatcher' then begin
-    slExport.Add(slCommentOut.Values['Skin'] + 'filterByNpcs=' + exportTargetID + ':skin=' + exportSkinID);
+    slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
 
     // 各設定行は対応するoutputフラグがONの場合のみ出力
+    if outputSkin then
+      slExport.Add(slCommentOut.Values['Skin'] + 'filterByNpcs=' + exportTargetID + ':skin=' + exportSkinID);
+
     if outputRace then
       slExport.Add(slCommentOut.Values['Race'] + 'filterByNpcs=' + exportTargetID + ':race=' + exportRace);
 
@@ -502,6 +554,32 @@ begin
 
     if outputOutfit then
       slExport.Add(slCommentOut.Values['Outfit'] + 'filterByNpcs=' + exportTargetID + ':outfitDefault=' + exportOutfit);
+  end
+  else if framework = 'Recast' then begin
+    slExport.Add('[[npcs]]');
+    slExport.Add('target = "' + exportTargetID + '"');
+    slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
+
+    // 各設定行は対応するoutputフラグがONの場合のみ出力
+    if outputSkin then
+      slExport.Add(slCommentOut.Values['Skin'] + 'body = "' + exportSkinID + '"');
+
+    // RaceはRecastでは未対応だが、将来的に対応する可能性があるため、コメントとして残しておく
+    //if outputRace then
+    //  slExport.Add(slCommentOut.Values['Race'] + 'race ="' + exportRace + '"');
+
+    if outputGender then
+      slExport.Add(slCommentOut.Values['Gender'] + 'sex = "' + exportGender + '"');
+
+    if outputName then
+      slExport.Add(slCommentOut.Values['Name'] +  'name = "' + exportName + '"');
+
+    if outputVoiceType then
+      slExport.Add(slCommentOut.Values['VoiceType'] + + 'voice = "' + exportVoiceType + '"');
+
+  end
+  else if framework = 'RDF' then begin
+    slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
   end;
 
   slExport.Add(#13#10);
@@ -532,7 +610,12 @@ begin
     filterString := 'Ini (*.ini)|*.ini';
     fileExtension := '.ini';
   end
-  else begin
+  else if framework = 'Recast' then begin
+    saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\Recast\Patches\';
+    filterString := 'Toml (*.toml)|*.toml';
+    fileExtension := '.toml';
+  end
+  else if framework = 'RDF' then begin
     saveDir := DataPath + 'SkyPatcher RDF NPC Replacer Converter\SKSE\Plugins\RaceSwap\';
     filterString := 'Txt (*.txt)|*.txt';
     fileExtension := '.txt';
@@ -594,6 +677,7 @@ begin
 
             mrNo: begin
               // 上書きモード
+              InsertRecastManifest;
               AddMessage('Overwriting ' + ExportFileName);
               slExport.SaveToFile(ExportFileName);
               AddMessage('File overwritten successfully');
@@ -609,6 +693,7 @@ begin
         end
         else begin
           // ファイルが存在しない場合は通常通り保存
+          InsertRecastManifest;
           AddMessage('Saving ' + ExportFileName);
           slExport.SaveToFile(ExportFileName);
           AddMessage('File saved successfully');
