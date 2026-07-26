@@ -324,12 +324,13 @@ var
   replacerFormID, underscorePos: Cardinal;
   originalTargetID, recordSignature, targetFormID, targetEditorID, replacerEditorID: string; // レコードID関連
   trimedTargetFormID, trimedReplacerFormID, exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender, exportName, exportVoiceType, exportOutfit: string; // SkyPatcher, Recast設定ファイルの記入用
-  useTraits: boolean;
+  useTraits, skipSkinThisRecord: boolean;
 begin
   targetFormID    := '';
   targetEditorID  := '';
 
   recordSignature := 'NPC_';
+  skipSkinThisRecord := false;
 
 
   // NPCレコードでなければスキップ
@@ -412,7 +413,7 @@ begin
     if outputSkin then begin
       slCommentOut.Values['Skin'] := '';
       // 肌が同じ場合はコメントアウト
-      if GetElementNativeValues(replacerRecord, 'WNAM') = GetElementNativeValues(targetRaceRecord, 'WNAM') then
+      if GetElementNativeValues(replacerRecord, 'WNAM') = GetElementNativeValues(targetRecord, 'WNAM') then
         slCommentOut.Values['Skin'] := coChar;
     end;
 
@@ -502,12 +503,12 @@ begin
     if wnamID = '0' then
       exportSkinID := 'null'
     else
-      exportSkinID := wnamID;
+      exportSkinID := replacerFileName + '|' + wnamID;
   end
   else if framework = 'Recast' then begin
     // RecastはWNAMにデフォルトボディを指定する方法がないため、未設定の場合は設定行を出力しない
     if wnamID = '0' then
-      outputSkin := false
+      skipSkinThisRecord := false
     else
       exportSkinID := wnamID + '~' + replacerFileName;
   end;
@@ -561,7 +562,7 @@ begin
     slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
 
     // 各設定行は対応するoutputフラグがONの場合のみ出力
-    if outputSkin then
+    if outputSkin and not skipSkinThisRecord then
       slExport.Add(slCommentOut.Values['Skin'] + 'body = "' + exportSkinID + '"');
 
     // RaceはRecastでは未対応だが、将来的に対応する可能性があるため、コメントとして残しておく
@@ -575,7 +576,7 @@ begin
       slExport.Add(slCommentOut.Values['Name'] +  'name = "' + exportName + '"');
 
     if outputVoiceType then
-      slExport.Add(slCommentOut.Values['VoiceType'] + + 'voice = "' + exportVoiceType + '"');
+      slExport.Add(slCommentOut.Values['VoiceType'] +  'voice = "' + exportVoiceType + '"');
 
   end
   else if framework = 'RDF' then begin
