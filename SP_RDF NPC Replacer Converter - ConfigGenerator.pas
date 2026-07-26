@@ -508,7 +508,7 @@ begin
   else if framework = 'Recast' then begin
     // RecastはWNAMにデフォルトボディを指定する方法がないため、未設定の場合は設定行を出力しない
     if wnamID = '0' then
-      skipSkinThisRecord := false
+      skipSkinThisRecord := true
     else
       exportSkinID := wnamID + '~' + replacerFileName;
   end;
@@ -562,7 +562,7 @@ begin
     slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
 
     // 各設定行は対応するoutputフラグがONの場合のみ出力
-    if outputSkin and not skipSkinThisRecord then
+    if outputSkin = true and not skipSkinThisRecord then
       slExport.Add(slCommentOut.Values['Skin'] + 'body = "' + exportSkinID + '"');
 
     // RaceはRecastでは未対応だが、将来的に対応する可能性があるため、コメントとして残しておく
