@@ -321,16 +321,21 @@ var
   replacerFlags, templateFlags, replacerRaceElement, replacerVoiceTypeElement, replacerOutfitElement, targetFlags, targetRaceElement, targetVoiceTypeElement, targetOutfitElement: IInterface;
   replacerRecord, targetRecord, replacerRaceRecord, replacerVoiceTypeRecord, replacerOutfitRecord, targetRaceRecord, targetVoiceTypeRecord, targetOutfitRecord: IwbMainRecord;
   replacerName, targetName: string;
-  replacerFormID, underscorePos: Cardinal;
-  originalTargetID, recordSignature, targetFormID, targetEditorID, replacerEditorID: string; // レコードID関連
-  trimedTargetFormID, trimedReplacerFormID, exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender, exportName, exportVoiceType, exportOutfit: string; // SkyPatcher, Recast設定ファイルの記入用
-  useTraits, skipSkinThisRecord: boolean;
+  replacerFormIDNative, targetFormIDNative, underscorePos: Cardinal;
+  originalTargetID, recordSignature, targetFormIDHex, replacerFormIDHex, targetEditorID, replacerEditorID: string; // レコードID関連
+  localTargetFormID, localReplacerFormID,
+  trimedTargetFormID, trimedReplacerFormID,
+  paddedTargetFormID, paddedReplacerFormID: string; // FormIDを記入用に加工した文字列
+  exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender,
+  exportName, exportVoiceType, exportOutfit: string; // SkyPatcher, Recast設定ファイルの記入用
+  useTraits: boolean;
 begin
-  targetFormID    := '';
+  targetFormIDHex    := '';
   targetEditorID  := '';
+  replacerFormIDHex    := '';
+  replacerEditorID  := '';
 
   recordSignature := 'NPC_';
-  skipSkinThisRecord := false;
 
 
   // NPCレコードでなければスキップ
@@ -348,7 +353,8 @@ begin
     replacerRecord := e;
 
   // リプレイサーNPCのForm ID, Editor IDを取得
-  replacerFormID := GetElementNativeValues(replacerRecord, 'Record Header\FormID');
+  replacerFormIDNative := GetElementNativeValues(replacerRecord, 'Record Header\FormID');
+  replacerFormIDHex := IntToHex64(replacerFormIDNative, 8);
    //AddMessage('Replacer Form ID: ' + IntToStr(replacerFormID));
    //AddMessage('Replacer Form ID: ' + IntToHex(replacerFormID, 8));
   replacerEditorID := GetElementEditValues(replacerRecord, 'EDID');
@@ -370,7 +376,9 @@ begin
   AddMessage('Target file name set to: ' + targetFileName);
 
   // ターゲットNPCのFormID,EditorIDを取得
-  targetFormID := IntToHex64(GetElementNativeValues(targetRecord, 'Record Header\FormID') and  $FFFFFF, 8);
+  //targetFormID := IntToHex64(GetElementNativeValues(targetRecord, 'Record Header\FormID'), 8);
+  targetFormIDNative := GetElementNativeValues(targetRecord, 'Record Header\FormID');
+  targetFormIDHex := IntToHex64(targetFormIDNative, 8);
     //AddMessage('Target Record Form ID: ' + targetFormID);
   targetEditorID := GetElementEditValues(targetRecord, 'EDID');
     //AddMessage('Target Record Editor ID: ' + targetEditorID);
@@ -454,16 +462,28 @@ begin
   end;
 
   // 出力ファイル用の配列操作
+  // FormIDを8桁の16進数文字列に変換し、プラグイン内で有効な値を取り出す
+  if  UpperCase(Copy(targetFormIDHex, 1, 2)) = 'FE' then
+    localTargetFormID := Copy(targetFormIDHex, 6, 8)
+  else
+    localTargetFormID := Copy(targetFormIDHex, 3, 8);
+
+  if  UpperCase(Copy(replacerFormIDHex, 1, 2)) = 'FE' then
+    localReplacerFormID := Copy(replacerFormIDHex, 6, 8)
+  else
+    localReplacerFormID := Copy(replacerFormIDHex, 3, 8);
+
   if useFormID then begin
-    // ゼロパディングしない形式のForm IDを設定、iniファイルへの記入はこちらを利用する
-    if  UpperCase(Copy(targetFormID, 1, 2)) = 'FE' then
-      trimedTargetFormID := Copy(targetFormID, 6, 8)
-    else
-      trimedTargetFormID := Copy(targetFormID, 3, 8);
-
-    trimedTargetFormID := RemoveLeadingZeros(trimedTargetFormID);
-
-    trimedReplacerFormID := IntToHex(replacerFormID and  $FFFFFF, 1);
+    if framework = 'Recast' then begin
+      // Recastはゼロパディングした形式のForm IDを設定、tomlファイルへの記入はこちらを利用する
+      paddedTargetFormID := PadLeftZero(localTargetFormID, 8);
+      paddedReplacerFormID := PadLeftZero(localReplacerFormID, 8);
+    end
+    else begin
+      // ゼロパディングしない形式のForm IDを設定、Recast以外の設定ファイルはこちらを利用する
+      trimedTargetFormID := RemoveLeadingZeros(localTargetFormID);
+      trimedReplacerFormID := RemoveLeadingZeros(localReplacerFormID);
+    end;
 
     if framework = 'SkyPatcher' then begin
       exportTargetID := targetFileName + '|' + trimedTargetFormID;
@@ -475,8 +495,8 @@ begin
     else if framework = 'Recast' then begin
       //exportTargetID := '0x' + targetFormID + '~' + targetFileName;
       //exportReplacerID := '0x' + replacerFormID + '~' + replacerFileName;
-      exportTargetID := trimedTargetFormID + '~' + targetFileName;
-      exportReplacerID := trimedReplacerFormID + '~' + replacerFileName;
+      exportTargetID := '0x' + paddedTargetFormID + '~' + targetFileName;
+      exportReplacerID := '0x' + paddedReplacerFormID + '~' + replacerFileName;
       exportRace  := IntToHex(FormID(replacerRaceRecord) and  $FFFFFF, 1) + '~' + GetFileName(replacerRaceRecord);
       exportVoiceType := IntToHex(FormID(replacerVoiceTypeRecord) and  $FFFFFF, 1) + '~' + GetFileName(replacerVoiceTypeRecord);
       exportOutfit := IntToHex(FormID(replacerOutfitRecord) and  $FFFFFF, 1) + '~' + GetFileName(replacerOutfitRecord);
@@ -485,7 +505,6 @@ begin
       exportTargetID := trimedTargetFormID + '~' + targetFileName;
       exportReplacerID := trimedReplacerFormID + '~' + replacerFileName;
     end;
-
   end
   else begin
     exportTargetID := targetEditorID;
@@ -506,9 +525,9 @@ begin
       exportSkinID := replacerFileName + '|' + wnamID;
   end
   else if framework = 'Recast' then begin
-    // RecastはWNAMにデフォルトボディを指定する方法がないため、未設定の場合は設定行を出力しない
+    // RecastはWNAMにデフォルトボディを指定する方法がないため、未設定の場合はコメントアウトする
     if wnamID = '0' then
-      skipSkinThisRecord := true
+      slCommentOut.Values['Skin'] := coChar
     else
       exportSkinID := wnamID + '~' + replacerFileName;
   end;
@@ -532,7 +551,7 @@ begin
 
   // 設定行の見出しとして、ターゲットNPCの名前、FormID、EditorIDを出力する
   slExport.Add(coChar + GetElementEditValues(targetRecord, 'FULL'));
-  slExport.Add(coChar + 'Form ID: ' + targetFormID + '  Editor ID: ' + targetEditorID);
+  slExport.Add(coChar + 'Form ID: ' + localTargetFormID + '  Editor ID: ' + targetEditorID);
 
   if framework = 'SkyPatcher' then begin
     slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
@@ -562,7 +581,7 @@ begin
     slExport.Add(slCommentOut.Values['CopyVS'] + GenerateVisualStyleString(exportTargetID, exportReplacerID, framework));
 
     // 各設定行は対応するoutputフラグがONの場合のみ出力
-    if outputSkin = true and not skipSkinThisRecord then
+    if outputSkin then
       slExport.Add(slCommentOut.Values['Skin'] + 'body = "' + exportSkinID + '"');
 
     // RaceはRecastでは未対応だが、将来的に対応する可能性があるため、コメントとして残しておく

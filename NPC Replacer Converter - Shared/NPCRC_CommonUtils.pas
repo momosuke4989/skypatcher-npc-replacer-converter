@@ -222,7 +222,16 @@ begin
     Result := '0'
   else
     Result := Copy(s, i, Length(s) - i + 1);
-    Result := Copy(s, i, Length(s) - i + 1);
+end;
+
+function PadLeftZero(const s: string; targetLength: Integer): string;
+var
+  padded: string;
+begin
+  padded := s;
+  while Length(padded) < targetLength do
+    padded := '0' + padded;
+  Result := padded;
 end;
 
 function FindRecordByRecordID(const recordID, signature: string; useFormID: boolean): IwbMainRecord;
