@@ -270,7 +270,7 @@ end;
 procedure ReplaceFaceTintPath(faceMeshPath, faceTextureFullPath: string);
 var
   nif              : TwbNifFile;
-  block            : TwbNifBlock;
+  nifBlock         : TwbNifBlock;
   element          : TdfElement;
   faceTintElement  : TdfElement;
   lTextureList     : TList;
@@ -289,10 +289,10 @@ begin
 
     // Iterate over all blocks in a nif file and locate elements holding textures.
     for i := 0 to nif.BlocksCount - 1 do begin
-        block := nif.Blocks[i];
+        nifBlock := nif.Blocks[i];
 
-        if block.BlockType = 'BSShaderTextureSet' then begin
-            element := block.Elements['Textures'];
+        if nifBlock.BlockType = 'BSShaderTextureSet' then begin
+            element := nifBlock.Elements['Textures'];
             for j := 0 to element.Count - 1 do
                 lTextureList.Add(element[j]);
         end;
