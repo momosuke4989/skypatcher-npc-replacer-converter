@@ -7,6 +7,7 @@ function ShowCheckboxForm(const options, disableOpts: TStringList; caption: stri
 function FormIDInputValidation(const s: string): Boolean;
 function EditorIDInputValidation(const s: string; useUnderScore: boolean): Boolean;
 function RemoveLeadingZeros(const s: string): string;
+function PadLeftZero(const s: string; targetLength: Integer): string;
 function FindRecordByRecordID(const recordID, signature: string; useFormID: boolean): IwbMainRecord;
 function CreateSLValueFromRecordID(const editorID, formID, fileName: string): string;
 function CreateSLValueFromRecordIDWithName(const editorID, formID, fileName, NPCName: string): string;
