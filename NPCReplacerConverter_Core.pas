@@ -70,7 +70,7 @@ var
   firstRecordFileName, baseFileName, replacerFileName: string;
   testFile: boolean;
 
-  // イニシャル処理で設定・使用する変数
+  // イニシャライズ処理で設定・使用する変数
   prefix: string;
   removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
 
@@ -500,9 +500,9 @@ begin
   // 選択中のプラグインを検証、最初のレコードのみ実行する
   if testFile = false then begin
     //  マスターファイルを編集しようとしていたら中止
-    if IsMasterAEPlugin(e) then begin
+    if IsOfficialMaster(GetFileName(e)) then begin
       AddMessage(GetElementEditValues(e, 'EDID') + ' is a member of ' + GetFileName(e) + '! Do not Edit it!');
-      Result = -1;
+      Result := -1;
       Exit;
     end;
 
