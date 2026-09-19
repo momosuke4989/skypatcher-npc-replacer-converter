@@ -72,7 +72,7 @@ var
 
   // イニシャライズ処理で設定・使用する変数
   prefix: string;
-  removeFaceGen, removeFaceGenMissingRec, isInputProvided: boolean;
+  removeFaceGen, removeFaceGenMissingRec: boolean;
 
   // サマリー用変数
   recordCount, missingFaceGeomCount,
@@ -125,18 +125,18 @@ begin
 
   if removeFlag then begin
     if RenameFile(PChar(oldPath), PChar(newPath)) then begin
-      AddMessage('Move to: ' + oldPath + ' -> ' + newPath);
+      AddMessage('  Move to: ' + oldPath + ' -> ' + newPath);
       Result := true;
     end else
-      AddMessage('Failed to move: ' + oldPath);
+      AddMessage('  Failed to move: ' + oldPath);
   end
   else begin
     // ファイルをコピー
     if CopyFile(PChar(oldPath), PChar(newPath), False) then begin
-      AddMessage('Copied: ' + oldPath + ' -> ' + newPath);
+      AddMessage('  Copied: ' + oldPath + ' -> ' + newPath);
       Result := true;
     end else
-      AddMessage('Failed to copy: ' + oldPath);
+      AddMessage('  Failed to copy: ' + oldPath);
   end;
 end;
 
@@ -334,7 +334,7 @@ begin
     faceTintElement.EditValue := newFaceTintPath;
 
     faceTintElement.Root.SaveToFile(faceMeshPath);
-    AddMessage('Change FaceTint Path: ' + oldFaceTintPath + ' -> ' + newFaceTintPath);
+    AddMessage('  Change FaceTint Path: ' + oldFaceTintPath + ' -> ' + newFaceTintPath);
   finally
     lTextureList.Free;
     nif.Free;
@@ -376,11 +376,11 @@ end;
 
 function DoInitialize: integer;
 var
-  validInput : boolean;
   slOpts, slDisableOpts: TStringList;
   checkBoxCaption: string;
   i: Integer;
 begin
+  Result              := 0;
   testFile            := false;
 
   firstRecordFileName := '';
@@ -389,8 +389,6 @@ begin
 
   removeFaceGen       := false;
   removeFaceGenMissingRec   := false;
-  isInputProvided     := false;
-  validInput          := false;
 
   recordCount                 := 0;
   missingFaceGeomCount        := 0;
@@ -409,9 +407,6 @@ begin
 
   checkBoxCaption             := 'Choose CoreProcess Option';
 
-  Result              := 0;
-
-
   // 各オプションの設定
   try
 
@@ -422,14 +417,13 @@ begin
     begin
       AddMessage('You selected:');
       for i := 0 to slOpts.Count - 1 do
-        AddMessage(slOpts.Names[i] + ' - ' + slOpts.ValueFromIndex[i]);
+        AddMessage('  ' + slOpts.Names[i] + ' - ' + slOpts.ValueFromIndex[i]);
     end
     else begin
       AddMessage('Selection was canceled.');
       Result := -1;
       Exit;
     end;
-
 
     // コピー元のFaceGenファイルを残すか
     removeFaceGen := GetBoolSLValue(slOpts.Values['Remove FaceGen files in the replacer mod']);
@@ -443,35 +437,15 @@ begin
   end;
 
   // プレフィックスを入力
-  repeat
-    isInputProvided := InputQuery('New Editor ID Prefix Input', 'Enter the prefix. Only letters (a-z, A-Z) and digits (0-9) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:', prefix);
-    if not isInputProvided then begin
-      MessageDlg('Cancel was pressed, aborting the script.', mtInformation, [mbOK], 0);
-      Result := -1;
-      Exit;
-    end;
-//    AddMessage('now prefix:' + prefix);
-    // 入力のチェック
-    if prefix = '' then begin
-        MessageDlg('Input is empty. Please reenter prefix.', mtInformation, [mbOK], 0);
-        validInput := false;
-    end
-    else begin
-      if EditorIDInputValidation(prefix, false) then begin
-        AddMessage('The input is valid.');
-        validInput := true;
-      end
-      else begin
-        MessageDlg('The input is invalid. Only enter valid characters.', mtInformation, [mbOK], 0);
-        AddMessage('The input is invalid.');
-        validInput := false;
-      end;
-    end;
-
-    if validInput = false then
-      prefix := '';
-
-  until (isInputProvided) and (validInput);
+  if not AskEditorIDPrefix(
+    'New Editor ID Prefix Input',
+    'Enter the prefix. Only letters (a-z, A-Z) and digits (0-9) are allowed.' + #13#10 + 'Underscore (_) will be added to the prefix you enter:',
+    false,
+    prefix) then begin
+    MessageDlg('Cancel was pressed, aborting the script.', mtInformation, [mbOK], 0);
+    Result := -1;
+    Exit;
+  end;
 
   AddMessage('Prefix set to: ' + prefix);
 end;
@@ -480,7 +454,7 @@ function DoProcess(const e: IInterface; var createdRecord: IInterface): integer;
 var
   replacerFile: IwbFile;
   newRecord:  IInterface;
-  recordFlag, compareStrRslt: Cardinal;
+  compareStrRslt: Cardinal;
   eslFlag, useTraitsFlag,
   missingFacegeom, missingFacetint: boolean;
   NPCName,
@@ -491,17 +465,12 @@ var
   newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
 
 begin
-
-  {if not Assigned(e) then begin
-    Result := 1; // スキップ
-    exit;
-  end;
-  }
+  Result := 0;
   // 選択中のプラグインを検証、最初のレコードのみ実行する
   if testFile = false then begin
     //  マスターファイルを編集しようとしていたら中止
     if IsOfficialMaster(GetFileName(e)) then begin
-      AddMessage(GetElementEditValues(e, 'EDID') + ' is a member of ' + GetFileName(e) + '! Do not Edit it!');
+      AddMessage(EditorID(e) + ' is a member of ' + GetFileName(e) + '! Do not Edit it!');
       Result := -1;
       Exit;
     end;
@@ -548,13 +517,13 @@ begin
 
   // NPCレコードでなければスキップ
   if Signature(e) <> 'NPC_' then begin
-    AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC record.');
+    AddMessage(EditorID(e) + ' is not NPC record.');
     Exit;
   end;
 
   // 選択中のレコードが他のレコードをオーバーライドしていなかったらスキップ
   if IsMaster(e) then begin
-    AddMessage(GetElementEditValues(e, 'EDID') + ' does not overwrite other record.');
+    AddMessage(EditorID(e) + ' does not overwrite other record.');
     Exit;
   end;
 
@@ -565,9 +534,10 @@ begin
   missingFacetint := false;
   useTraitsFlag := false;
 
+  AddMessage('Converting NPC record name:' + Name(e));
   // コピー元のFormID,EditorID,FaceGenファイルのパスを取得
   oldFormID := IntToHex64(GetElementNativeValues(e, 'Record Header\FormID') and  $FFFFFF, 8);
-  oldEditorID := GetElementEditValues(e, 'EDID');
+  oldEditorID := EditorID(e);
   NPCName := GetElementEditValues(e, 'FULL');
 
   oldMeshPath := GetFaceGenPath(baseFileName, oldFormID, false, MESHMODE);
@@ -577,19 +547,17 @@ begin
 
   // FaceGenファイルが存在するかチェック
   if not FileExists(oldMeshPath) then begin
-    AddMessage('File not found: ' + oldMeshPath);
+    AddMessage('  File not found: ' + oldMeshPath);
     missingFacegeom := true
   end;
 
   if not FileExists(oldTexturePath) then begin
-    AddMessage('File not found: ' + oldTexturePath);
+    AddMessage('  File not found: ' + oldTexturePath);
     missingFacetint := true;
   end;
 
   // レコードがuse traitsフラグを持っているか確認
-  recordFlag := GetElementNativeValues(ElementBySignature(e, 'ACBS'), 'Template Flags');
-  if (recordFlag and $01) <> 0 then
-    useTraitsFlag := true;
+  useTraitsFlag := IsNPCUsingTraits(e);
 
   // レコードID,ファイル名を変数に格納
   recordID := 'Form ID: ' + oldFormID + ', Editor ID: ' + oldEditorID;
@@ -600,10 +568,10 @@ begin
   if missingFacegeom and missingFacetint then begin
     Inc(missingFaceGenBothCount);
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-    AddMessage('Neither a FaceGeom file nor a FaceTint file exists associated with this record.');
+    AddMessage('  Neither a FaceGeom file nor a FaceTint file exists associated with this record.');
     // ユーザオプションに基づいてレコードを削除するか判断、削除したら次のレコードの処理へ移行
     if removeFaceGenMissingRec then begin
-      AddMessage('Remove this record based on the user''s options. ' + recordID);
+      AddMessage('  Remove this record based on the user''s options. ' + recordID);
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
       Inc(removedRecordCount);
       Remove(e);
@@ -612,13 +580,13 @@ begin
 
     // Use Traitsフラグを持っていない場合は異常と判断し、処理をスキップ
     if useTraitsFlag then begin
-      AddMessage('This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.');
+      AddMessage('  This record (' + recordID + ') uses a template and has the Use Traits flag, so it''s normal that it doesn''t have FaceGen files.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
       Inc(useTraitsCount);
       slMissingFaceGenWithUseTraits.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
     end
     else begin
-      AddMessage('This record (' + recordID + ') should have FaceGen files, but none were found.');
+      AddMessage('  This record (' + recordID + ') should have FaceGen files, but none were found.');
       AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
       slMissingFaceGenBothRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
       Exit;
@@ -626,7 +594,7 @@ begin
   end
   else if missingFacegeom and not missingFacetint then begin
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-    AddMessage('FaceGeom file associated with this record (' + recordID + ') is missing.');
+    AddMessage('  FaceGeom file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceGeomCount);
     slMissingFaceGeomRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
@@ -634,7 +602,7 @@ begin
   end
   else if not missingFacegeom and missingFacetint then begin
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-    AddMessage('FaceTint file associated with this record (' + recordID + ') is missing.');
+    AddMessage('  FaceTint file associated with this record (' + recordID + ') is missing.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceTintCount);
     slMissingFaceTintRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
@@ -645,7 +613,7 @@ begin
   // レコードを複製
   newRecord := wbCopyElementToFile(e, GetFile(e), True, True);
   if not Assigned(newRecord) then begin
-    AddMessage('Error: Failed to copy record for ' + Name(e));
+    AddMessage('  Error: Failed to copy record for ' + Name(e));
     Exit;
   end;
 
@@ -711,18 +679,21 @@ function RunCoreProcessInitialize: integer;
 begin
   AddMessage('CoreProcess: Initialize');
   Result := DoInitialize;
+  AddMessage('CoreProcess: Initialize Completed');
 end;
 
 function RunCoreProcess(const e: IInterface; var createdRecord: IInterface): integer;
 begin
   AddMessage('CoreProcess: Run Process');
   Result := DoProcess(e, createdRecord);
+  AddMessage('CoreProcess: Run Process Completed');
 end;
 
 function RunCoreProcessFinalize: integer;
 begin
   AddMessage('CoreProcess: Finalize');
   Result := DoFinalize;
+  AddMessage('CoreProcess: Finalize Completed');
 end;
 
 
@@ -737,7 +708,7 @@ begin
   convertedRecord := nil;
   Result := DoProcess(e, convertedRecord);
   if Assigned(convertedRecord) then
-    AddMessage('Converted NPC record name:' + Name(convertedRecord));
+    AddMessage('  Converted NPC record name:' + Name(convertedRecord));
 end;
 
 function Finalize: integer;
