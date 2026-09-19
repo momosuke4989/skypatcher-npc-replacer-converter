@@ -84,23 +84,6 @@ var
   slMissingFaceGenBothRecordID,
   slMissingFaceGenWithUseTraits: TStringList;
 
-function IsMasterAEPlugin(plugin: IInterface): Boolean;
-var
-  pluginName  : String;
-Begin
-  pluginName := GetFileName(plugin);
-  Result := (CompareStr(pluginName, 'Skyrim.esm') = 0) or
-            (CompareStr(pluginName, 'Update.esm') = 0) or
-            (CompareStr(pluginName, 'Dawnguard.esm') = 0) or
-            (CompareStr(pluginName, 'HearthFires.esm') = 0) or
-            (CompareStr(pluginName, 'Dragonborn.esm') = 0) or
-            (CompareStr(pluginName, 'ccBGSSSE001-Fish.esm') = 0) or
-            (CompareStr(pluginName, 'ccQDRSSE001-SurvivalMode.esl') = 0) or
-            (CompareStr(pluginName, 'ccBGSSSE037-Curios.esl') = 0) or
-            (CompareStr(pluginName, 'ccBGSSSE025-AdvDSGS.esm') = 0) or
-            (CompareStr(pluginName, '_ResourcePack.esl') = 0);
-End;
-
 function GetFaceGenPath(pluginName, formID: string; isNewPath, mode: boolean): string;
 begin
   if mode = MESHMODE then
@@ -226,7 +209,6 @@ begin
     if nextObjectID > ESLMAXFORMID then
       invalidObjectID := true;
   end;
-
 
 
   // Form IDの判定
