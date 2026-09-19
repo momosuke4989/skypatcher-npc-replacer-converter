@@ -1,17 +1,17 @@
 {
   ==============================================================================
-   SP_RDF_NPCReplacerConverter_PreProcessor.pas
+   NPCReplacerConverter_Core.pas
   ==============================================================================
 
    Description:
-     This script is part of the "SkyPatcher RDF NPC Replacer Converter" toolset.
-     It serves as the *PreProcessor* phase that prepares NPC records before
+     This script is part of the "NPC Replacer Converter" toolset.
+     It serves as the *CoreProcess* phase that prepares NPC records before
      configuration generation. The script duplicates selected NPC records and
      renames the Editor ID, copies or moves their associated FaceGen files,
      and performs validation for ESL-flagged plugins to ensure safe FormID allocation.
 
    Features:
-     - Prompts user for preprocessing options such as FaceGen removal.
+     - Prompts user for CoreProcess options such as FaceGen removal.
      - Validates ESL-flagged ESPs and resets invalid FormIDs if necessary.
      - Copies or moves FaceGen (FaceGeom / FaceTint) files with renamed paths.
      - Adds a prefix to Editor IDs of duplicated NPC records.
@@ -38,15 +38,15 @@
   ==============================================================================
 }
 
-unit SP_RDF_NPCReplacerConverter_PreProcessor;
+unit NPCReplacerConverter_Core;
 
-uses 'NPC Replacer Converter - Shared\NPCRC_CommonUtils';
+uses 'xEdit_mmskCommonLibrary\xEdit_mmskCommonLibrary';
 
 interface
 
-function RunPreProcInitialize: integer;
-function RunPreProcessor(const e: IInterface; var createdRecord: IInterface): integer;
-function RunPreProcFinalize: integer;
+function RunCoreProcessInitialize: integer;
+function RunCoreProcess(const e: IInterface; var createdRecord: IInterface): integer;
+function RunCoreProcessFinalize: integer;
 
 implementation
 
@@ -105,12 +105,12 @@ function GetFaceGenPath(pluginName, formID: string; isNewPath, mode: boolean): s
 begin
   if mode = MESHMODE then
     if isNewPath = true then
-      Result := Format('%sSkyPatcher RDF NPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
+      Result := Format('%sNPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
     else
       Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
   if mode = TEXTUREMODE then
     if isNewPath = true then
-      Result := Format('%sSkyPatcher RDF NPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
+      Result := Format('%sNPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
     else
       Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
@@ -407,7 +407,7 @@ begin
   slOpts                := TStringList.Create;
   slDisableOpts         := TStringList.Create;
 
-  checkBoxCaption             := 'Choose PreProcessor Option';
+  checkBoxCaption             := 'Choose CoreProcess Option';
 
   Result              := 0;
 
@@ -681,7 +681,7 @@ end;
 
 function DoFinalize: integer;
 begin
-  AddMessage('--------------------------------PreProcessing Summary--------------------------------');
+  AddMessage('--------------------------------CoreProcess Summary--------------------------------');
   AddMessage('Total Records Processed: ' + IntToStr(recordCount));
   AddMessage('Total Records with Missing FaceGen Files: ' + IntToStr(missingFaceGenBothCount + missingFaceGeomCount + missingFaceTintCount));
   AddMessage('Total Removed Records: ' + IntToStr(removedRecordCount));
@@ -698,7 +698,7 @@ begin
   AddMessage(#13#10 + 'Records Missing FaceTint File: ' + IntToStr(missingFaceTintCount));
   DisplayMissingFaceGenRecordID(slMissingFaceTintRecordID);
 
-  AddMessage(#13#10 + '------------------------------PreProcessing Summary End------------------------------');
+  AddMessage(#13#10 + '------------------------------CoreProcess Summary End------------------------------');
 
   slMissingFaceGenBothRecordID.Free;
   slMissingFaceGenWithUseTraits.Free;
@@ -707,21 +707,21 @@ begin
 
 end;
 
-function RunPreProcInitialize: integer;
+function RunCoreProcessInitialize: integer;
 begin
-  AddMessage('PreProcessor: Initialize');
+  AddMessage('CoreProcess: Initialize');
   Result := DoInitialize;
 end;
 
-function RunPreProcessor(const e: IInterface; var createdRecord: IInterface): integer;
+function RunCoreProcess(const e: IInterface; var createdRecord: IInterface): integer;
 begin
-  AddMessage('PreProcessor: Run PreProcess');
+  AddMessage('CoreProcess: Run Process');
   Result := DoProcess(e, createdRecord);
 end;
 
-function RunPreProcFinalize: integer;
+function RunCoreProcessFinalize: integer;
 begin
-  AddMessage('PreProcessor: Finalize');
+  AddMessage('CoreProcess: Finalize');
   Result := DoFinalize;
 end;
 
