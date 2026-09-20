@@ -1,17 +1,17 @@
 {
   ==============================================================================
-   NPCReplacerConverter_Core.pas
+   NPCReplacerIsolator.pas
   ==============================================================================
 
    Description:
      This script is part of the "NPC Replacer Converter" toolset.
-     It serves as the *CoreProcess* phase that prepares NPC records before
+     It serves as the *Isolator Process* phase that prepares NPC records before
      configuration generation. The script duplicates selected NPC records and
      renames the Editor ID, copies or moves their associated FaceGen files,
      and performs validation for ESL-flagged plugins to ensure safe FormID allocation.
 
    Features:
-     - Prompts user for CoreProcess options such as FaceGen removal.
+     - Prompts user for Isolator Process options such as FaceGen removal.
      - Validates ESL-flagged ESPs and resets invalid FormIDs if necessary.
      - Copies or moves FaceGen (FaceGeom / FaceTint) files with renamed paths.
      - Adds a prefix to Editor IDs of duplicated NPC records.
@@ -38,15 +38,15 @@
   ==============================================================================
 }
 
-unit NPCReplacerConverter_Core;
+unit NPCReplacerIsolator;
 
 uses 'xEdit_mmskCommonLibrary\xEdit_mmskCommonLibrary';
 
 interface
 
-function RunCoreProcessInitialize: integer;
-function RunCoreProcess(const e: IInterface; var createdRecord: IInterface): integer;
-function RunCoreProcessFinalize: integer;
+function RunIsolatorInitialize: integer;
+function RunIsolatorProcess(const e: IInterface; var createdRecord: IInterface): integer;
+function RunIsolatorFinalize: integer;
 
 implementation
 
@@ -387,7 +387,7 @@ begin
   slOpts                := TStringList.Create;
   slDisableOpts         := TStringList.Create;
 
-  checkBoxCaption             := 'Choose CoreProcess Option';
+  checkBoxCaption             := 'Choose Isolator Process Option';
 
   // 各オプションの設定
   try
@@ -451,7 +451,7 @@ begin
   // 選択中のプラグインを検証、最初のレコードのみ実行する
   if testFile = false then begin
     //  マスターファイルを編集しようとしていたら中止
-    if IsOfficialMaster(GetFileName(e)) then begin
+    if IsOfficialMaster(GetFileName(GetFile(e))) then begin
       AddMessage(EditorID(e) + ' is a member of ' + GetFileName(e) + '! Do not Edit it!');
       Result := -1;
       Exit;
@@ -631,7 +631,7 @@ end;
 
 function DoFinalize: integer;
 begin
-  AddMessage('--------------------------------CoreProcess Summary--------------------------------');
+  AddMessage('--------------------------------Isolator Process Summary--------------------------------');
   AddMessage('Total Records Processed: ' + IntToStr(recordCount));
   AddMessage('Total Records with Missing FaceGen Files: ' + IntToStr(missingFaceGenBothCount + missingFaceGeomCount + missingFaceTintCount));
   AddMessage('Total Removed Records: ' + IntToStr(removedRecordCount));
@@ -648,7 +648,7 @@ begin
   AddMessage(#13#10 + 'Records Missing FaceTint File: ' + IntToStr(missingFaceTintCount));
   DisplayMissingFaceGenRecordID(slMissingFaceTintRecordID);
 
-  AddMessage(#13#10 + '------------------------------CoreProcess Summary End------------------------------');
+  AddMessage(#13#10 + '------------------------------Isolator Process Summary End------------------------------');
 
   slMissingFaceGenBothRecordID.Free;
   slMissingFaceGenWithUseTraits.Free;
@@ -657,25 +657,25 @@ begin
 
 end;
 
-function RunCoreProcessInitialize: integer;
+function RunIsolatorInitialize: integer;
 begin
-  AddMessage('CoreProcess: Initialize');
+  AddMessage('Isolator Process: Initialize');
   Result := DoInitialize;
-  AddMessage('CoreProcess: Initialize Completed');
+  AddMessage('Isolator Process: Initialize Completed');
 end;
 
-function RunCoreProcess(const e: IInterface; var createdRecord: IInterface): integer;
+function RunIsolatorProcess(const e: IInterface; var createdRecord: IInterface): integer;
 begin
-  AddMessage('CoreProcess: Run Process');
+  AddMessage('Isolator Process: Run Process');
   Result := DoProcess(e, createdRecord);
-  AddMessage('CoreProcess: Run Process Completed');
+  AddMessage('Isolator Process: Run Process Completed');
 end;
 
-function RunCoreProcessFinalize: integer;
+function RunIsolatorFinalize: integer;
 begin
-  AddMessage('CoreProcess: Finalize');
+  AddMessage('Isolator Process: Finalize');
   Result := DoFinalize;
-  AddMessage('CoreProcess: Finalize Completed');
+  AddMessage('Isolator Process: Finalize Completed');
 end;
 
 
