@@ -75,7 +75,7 @@ var
 
   // イニシャライズ処理で設定・使用する変数
   prefix: string;
-  removeFaceGen, removeFaceGenMissingRec: boolean;
+  removeFaceGen, removeFaceGenMissingRec, addDisableFlag: boolean;
 
   // サマリー用変数
   recordCount, missingFaceGeomCount,
@@ -358,6 +358,21 @@ begin
   end;
 end;
 
+procedure DisableNPCPlacedRecord(baseNPCRecord: IwbMainRecord;);
+var
+  refRecord: IwbMainRecord;
+  i: integer;
+begin
+  for i := 0 to Pred(ReferencedByCount(baseNPCRecord)) do begin
+    // Scan for records that reference the replaced NPC record
+    refRecord := ReferencedByIndex(baseNPCRecord, i);
+    //AddMessage(IntToStr(i) + '. RefernceRecord Signature: ' + Signature(refRecord));
+    if Signature(refRecord) = 'ACHR' then begin
+      SetIsInitiallyDisabled(refRecord, true);
+      AddMessage('  [' + IntToHex64(GetLoadOrderFormID(refRecord), 8) + '] ' + EditorID(refRecord) + ' is Disabled.');
+    end;
+  end;
+end;
 
 function DoInitialize: integer;
 var
@@ -374,6 +389,7 @@ begin
 
   removeFaceGen       := false;
   removeFaceGenMissingRec   := false;
+  addDisableFlag      := false;
 
   recordCount                 := 0;
   missingFaceGeomCount        := 0;
@@ -397,6 +413,7 @@ begin
 
     slOpts.Values['Remove FaceGen files in the replacer mod'] := 'False';
     slOpts.Values['Remove NPC records without FaceGen files'] := 'False';
+    slOpts.Values['Add Disabled flag to ACHR records for referenced NPC'] := 'False';
 
     if ShowCheckboxForm(slOpts, slDisableOpts, checkBoxCaption) then
     begin
@@ -415,6 +432,9 @@ begin
 
     // FaceGenファイルを持たないNPCレコードをコピーするか
     removeFaceGenMissingRec := GetBoolSLValue(slOpts.Values['Remove NPC records without FaceGen files']);
+
+    // NPCレコードを参照するACHRレコードにDisableフラグを付与するか
+    addDisableFlag := GetBoolSLValue(slOpts.Values['Add Disabled flag to ACHR records for referenced NPC']);
 
   finally
     slOpts.Free;
@@ -502,14 +522,23 @@ begin
 
   // NPCレコードでなければスキップ
   if Signature(e) <> 'NPC_' then begin
-    AddMessage(EditorID(e) + ' is not NPC record.');
+    AddMessage(EditorID(e) + ' is not NPC record. Processing will be skipped.');
     Exit;
   end;
 
   // 選択中のレコードが他のレコードをオーバーライドしていなかったらスキップ
   if IsMaster(e) then begin
-    AddMessage(EditorID(e) + ' does not overwrite other record.');
-    Exit;
+    AddMessage(EditorID(e) + ' does not override other record.');
+    if addDisableFlag then begin
+      AddMessage('  "Add Disabled flag" option is true. Searching for ACHR record refereeing the NPC...');
+      DisableNPCPlacedRecord(e);
+      AddMessage('  All ACHR records refereeing ' + EditorID(e) + ' are disabled. Subsequent processing will be skipped.');
+      Exit;
+    end
+    else begin
+      AddMessage('Processing will be skipped.');
+      Exit;
+    end;
   end;
 
   Inc(recordCount);
