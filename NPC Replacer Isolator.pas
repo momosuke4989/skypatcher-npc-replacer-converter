@@ -75,7 +75,7 @@ var
 
   // イニシャライズ処理で設定・使用する変数
   prefix: string;
-  removeFaceGen, removeFaceGenMissingRec, addDisableFlag: boolean;
+  removeFaceGen, removeFaceGenMissingRec, addDisableFlag, useVanillaFaceTint: boolean;
 
   // サマリー用変数
   recordCount, missingFaceGeomCount,
@@ -374,6 +374,57 @@ begin
   end;
 end;
 
+function FindResourceContainer(const relPath: string): string;
+var
+  slContainers: TStringList;
+  i, vanillaIdx, bsaIdx: integer;
+  lowerName: string;
+begin
+  Result := '';
+  vanillaIdx := -1;
+  bsaIdx := -1;
+
+  slContainers := TStringList.Create;
+  try
+    // Get the list of containers (BSA files / Data folder) that hold this file
+    ResourceCount(relPath, slContainers);
+    if slContainers.Count = 0 then begin
+      AddMessage('Not found in any BSA or Data folder: ' + relPath);
+      Exit;
+    end;
+
+    // Prefer the vanilla BSA, then any BSA, then the first container
+    for i := 0 to slContainers.Count - 1 do begin
+      lowerName := LowerCase(slContainers[i]);
+      if (vanillaIdx = -1) and (Pos('skyrim - textures', lowerName) > 0) then
+        vanillaIdx := i;
+      if (bsaIdx = -1) and (Pos('.bsa', lowerName) > 0) then
+        bsaIdx := i;
+    end;
+
+    if vanillaIdx >= 0 then
+      Result := slContainers[vanillaIdx]
+    else if bsaIdx >= 0 then
+      Result := slContainers[bsaIdx]
+    else
+      Result := slContainers[0];
+  finally
+    slContainers.Free;
+  end;
+end;
+
+procedure ExtractVanillaFaceTint(const containerName, relPath, outPath: string);
+begin
+
+  if not DirectoryExists(ExtractFilePath(outPath)) then
+    ForceDirectories(ExtractFilePath(outPath));
+
+  ResourceCopy(containerName, relPath, outPath);
+
+  if not FileExists(outPath) then
+    AddMessage('Failed to extract: ' + relPath);
+end;
+
 function DoInitialize: integer;
 var
   slOpts, slDisableOpts: TStringList;
@@ -390,6 +441,7 @@ begin
   removeFaceGen       := false;
   removeFaceGenMissingRec   := false;
   addDisableFlag      := false;
+  useVanillaFaceTint  := false;
 
   recordCount                 := 0;
   missingFaceGeomCount        := 0;
@@ -414,6 +466,7 @@ begin
     slOpts.Values['Remove FaceGen files in the replacer mod'] := 'False';
     slOpts.Values['Remove NPC records without FaceGen files'] := 'False';
     slOpts.Values['Add Disabled flag to ACHR records for referenced NPC'] := 'False';
+    slOpts.Values['Extract vanilla FaceTint if original FaceTint missing'] := 'False';
 
     if ShowCheckboxForm(slOpts, slDisableOpts, checkBoxCaption) then
     begin
@@ -435,6 +488,9 @@ begin
 
     // NPCレコードを参照するACHRレコードにDisableフラグを付与するか
     addDisableFlag := GetBoolSLValue(slOpts.Values['Add Disabled flag to ACHR records for referenced NPC']);
+
+    // オリジナルのFaceTintが見つからない場合、バニラのFaceTintを抽出して利用するか
+    useVanillaFaceTint := GetBoolSLValue(slOpts.Values['Extract vanilla FaceTint if original FaceTint missing']);
 
   finally
     slOpts.Free;
@@ -468,6 +524,7 @@ var
   recordID, recordFileName: string; // レコードID関連
   oldMeshPath, oldTexturePath,
   newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
+  containerName, relPath: string;
 
 begin
   Result := 0;
@@ -620,7 +677,18 @@ begin
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceTintCount);
     slMissingFaceTintRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
-    Exit;
+    if useVanillaFacetint then begin
+      AddMessage('  Extract Vanilla FaceTint file');
+      // バニラFaceTintを抽出しoldPathに配置
+      relPath := Copy(oldTexturePath, Length(DataPath) + 1, Length(oldTexturePath));
+      containerName := FindResourceContainer(relPath);
+      AddMessage('  Found container name: ' + containerName);
+      ExtractVanillaFaceTint(containerName, relPath, oldTexturePath);
+      // バニラFaceTintを抽出して使うのでフラグを修正
+      missingFacetint := false;
+    end
+    else
+      Exit;
   end;
 
 
