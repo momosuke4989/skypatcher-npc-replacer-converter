@@ -58,6 +58,9 @@ const
   MESHMODE = true;
   TEXTUREMODE = false;
 
+  // 単体実行時出力先フォルダ
+  CALLER_SELF = 'NPC Replacer Isolator';
+
   // ESLフラグ付きespのテストで利用する定数
   OLDESLMAXRECORDS = 2047;
   NEWESLMAXRECORDS = 4095;
@@ -84,16 +87,16 @@ var
   slMissingFaceGenBothRecordID,
   slMissingFaceGenWithUseTraits: TStringList;
 
-function GetFaceGenPath(pluginName, formID: string; isNewPath, mode: boolean): string;
+function GetFaceGenPath(pluginName, formID, callerScriptName: string; isNewPath, mode: boolean): string;
 begin
   if mode = MESHMODE then
     if isNewPath = true then
-      Result := Format('%sNPC Replacer Converter\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID])
+      Result := Format('%s%s\meshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, callerScriptName, pluginName, formID])
     else
       Result := Format('%smeshes\actors\character\FaceGenData\FaceGeom\%s\%s.nif', [DataPath, pluginName, formID]);
   if mode = TEXTUREMODE then
     if isNewPath = true then
-      Result := Format('%sNPC Replacer Converter\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID])
+      Result := Format('%s%s\textures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, callerScriptName, pluginName, formID])
     else
       Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
@@ -432,7 +435,7 @@ begin
   AddMessage('Prefix set to: ' + prefix);
 end;
 
-function DoProcess(const e: IInterface; var createdRecord: IInterface): integer;
+function DoProcess(const e: IInterface; var createdRecord: IInterface; callerScriptName: string): integer;
 var
   replacerFile: IwbFile;
   newRecord:  IInterface;
@@ -522,9 +525,9 @@ begin
   oldEditorID := EditorID(e);
   NPCName := GetElementEditValues(e, 'FULL');
 
-  oldMeshPath := GetFaceGenPath(baseFileName, oldFormID, false, MESHMODE);
+  oldMeshPath := GetFaceGenPath(baseFileName, oldFormID, callerScriptName, false, MESHMODE);
 //    AddMessage('oldMeshPath:' + oldMeshPath);
-  oldTexturePath := GetFaceGenPath(baseFileName, oldFormID, false, TEXTUREMODE);
+  oldTexturePath := GetFaceGenPath(baseFileName, oldFormID, callerScriptName, false, TEXTUREMODE);
 //    AddMessage('oldTexturePath:' + oldTexturePath);
 
   // FaceGenファイルが存在するかチェック
@@ -607,9 +610,9 @@ begin
   // AddMessage('Created new record with Editor ID: ' + newEditorID);
 
   // 新しいFaceGenファイルのパスを取得
-  newMeshPath := GetFaceGenPath(replacerFileName, newFormID, true, MESHMODE);
+  newMeshPath := GetFaceGenPath(replacerFileName, newFormID, callerScriptName, true, MESHMODE);
 //    AddMessage('newMeshPath:' + newMeshPath);
-  newTexturePath := GetFaceGenPath(replacerFileName, newFormID, true, TEXTUREMODE);
+  newTexturePath := GetFaceGenPath(replacerFileName, newFormID, callerScriptName, true, TEXTUREMODE);
 //    AddMessage('newTexturePath:' + newTexturePath);
 
   if not STOPFACEGENMANIPULATION then begin
@@ -664,10 +667,10 @@ begin
   AddMessage('Isolator Process: Initialize Completed');
 end;
 
-function RunIsolatorProcess(const e: IInterface; var createdRecord: IInterface): integer;
+function RunIsolatorProcess(const e: IInterface; var createdRecord: IInterface; callerScriptName: string): integer;
 begin
   AddMessage('Isolator Process: Run Process');
-  Result := DoProcess(e, createdRecord);
+  Result := DoProcess(e, createdRecord, callerScriptName);
   AddMessage('Isolator Process: Run Process Completed');
 end;
 
@@ -688,7 +691,7 @@ function Process(e: IInterface): integer;
 var convertedRecord: IInterface;
 begin
   convertedRecord := nil;
-  Result := DoProcess(e, convertedRecord);
+  Result := DoProcess(e, convertedRecord, CALLER_SELF);
   if Assigned(convertedRecord) then
     AddMessage('  Converted NPC record name:' + Name(convertedRecord));
 end;
