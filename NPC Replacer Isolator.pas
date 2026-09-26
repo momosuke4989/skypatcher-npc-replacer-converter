@@ -101,7 +101,7 @@ begin
       Result := Format('%stextures\actors\character\FaceGenData\FaceTint\%s\%s.dds', [DataPath, pluginName, formID]);
 end;
 
-function ManipulateFaceGenFile(oldPath, newPath: string; removeFlag: boolean): boolean;
+function ManipulateFaceGenFile(oldPath, newPath: string; mode, vanillaFaceTintExtracted: boolean): boolean;
 begin
   Result := false;
 
@@ -109,20 +109,47 @@ begin
   if not DirectoryExists(ExtractFilePath(newPath)) then
     ForceDirectories(ExtractFilePath(newPath));
 
-  if removeFlag then begin
-    if RenameFile(PChar(oldPath), PChar(newPath)) then begin
-      AddMessage('  Move to: ' + oldPath + ' -> ' + newPath);
-      Result := true;
-    end else
-      AddMessage('  Failed to move: ' + oldPath);
+  if mode = MESHMODE then begin
+    if removeFaceGen then begin
+      if RenameFile(PChar(oldPath), PChar(newPath)) then begin
+        AddMessage('  Move to: ' + oldPath + ' -> ' + newPath);
+        Result := true;
+      end else
+        AddMessage('  Failed to move: ' + oldPath);
+    end
+    else begin
+      // ファイルをコピー
+      if CopyFile(PChar(oldPath), PChar(newPath), False) then begin
+        AddMessage('  Copied: ' + oldPath + ' -> ' + newPath);
+        Result := true;
+      end else
+        AddMessage('  Failed to copy: ' + oldPath);
+    end;
   end
   else begin
-    // ファイルをコピー
-    if CopyFile(PChar(oldPath), PChar(newPath), False) then begin
-      AddMessage('  Copied: ' + oldPath + ' -> ' + newPath);
-      Result := true;
-    end else
-      AddMessage('  Failed to copy: ' + oldPath);
+    if (vanillaFaceTintExtracted) or (removeFaceGen) then begin
+      if vanillaFaceTintExtracted then begin
+        AddMessage('  You are using the extracted Vanilla FaceTint files. Switching the operation from copy to move.');
+      end;
+      // 抽出直後のファイルはロックが残っている可能性があるため、
+      // 排他アクセスを要求するRenameではなくCopy+Deleteで代替する
+      if CopyFile(PChar(oldPath), PChar(newPath), False) then begin
+        if DeleteFile(PChar(oldPath)) then
+          AddMessage('  Moved (copy+delete): ' + oldPath + ' -> ' + newPath)
+        else
+          AddMessage('  [WARN] Copied but failed to delete original: ' + oldPath);
+        Result := true;
+      end else
+        AddMessage('  Failed to copy: ' + oldPath);
+    end
+    else begin
+      // ファイルをコピー
+      if CopyFile(PChar(oldPath), PChar(newPath), False) then begin
+        AddMessage('  Copied: ' + oldPath + ' -> ' + newPath);
+        Result := true;
+      end else
+        AddMessage('  Failed to copy: ' + oldPath);
+    end;
   end;
 end;
 
@@ -524,7 +551,9 @@ var
   recordID, recordFileName: string; // レコードID関連
   oldMeshPath, oldTexturePath,
   newMeshPath, newTexturePath: string; // FaceGenファイルのパス格納用
+
   containerName, relPath: string;
+  vanillaFaceTintExtracted: boolean; // バニラFaceTint展開用
 
 begin
   Result := 0;
@@ -604,6 +633,7 @@ begin
   missingFacegeom := false;
   missingFacetint := false;
   useTraitsFlag := false;
+  vanillaFaceTintExtracted := false;
 
   AddMessage('Converting NPC record name:' + Name(e));
   // コピー元のFormID,EditorID,FaceGenファイルのパスを取得
@@ -677,15 +707,29 @@ begin
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Inc(missingFaceTintCount);
     slMissingFaceTintRecordID.Add(CreateSLValueFromRecordIDWithName(oldEditorID, oldFormID, recordFileName, NPCName));
-    if useVanillaFacetint then begin
+    if useVanillaFaceTint then begin
       AddMessage('  Extract Vanilla FaceTint file');
       // バニラFaceTintを抽出しoldPathに配置
       relPath := Copy(oldTexturePath, Length(DataPath) + 1, Length(oldTexturePath));
       containerName := FindResourceContainer(relPath);
-      AddMessage('  Found container name: ' + containerName);
-      ExtractVanillaFaceTint(containerName, relPath, oldTexturePath);
-      // バニラFaceTintを抽出して使うのでフラグを修正
-      missingFacetint := false;
+
+      if containerName = '' then
+        AddMessage('  No container found for Vanilla FaceTint.')
+      else begin
+        AddMessage('  Found container name: ' + containerName);
+        ExtractVanillaFaceTint(containerName, relPath, oldTexturePath);
+      end;
+
+
+      // 実際に展開できたかどうかをファイルの有無で確認する
+      if FileExists(oldTexturePath) then begin
+        vanillaFaceTintExtracted := true;
+        missingFacetint := false;
+      end
+      else begin
+        AddMessage('  Failed to extract Vanilla FaceTint. This record will be treated as missing FaceTint.');
+        Exit; // 既存の「FaceTint欠落・展開なし」パスと同じ扱いにする
+      end;
     end
     else
       Exit;
@@ -715,8 +759,8 @@ begin
   if not STOPFACEGENMANIPULATION then begin
     if not missingFacegeom and not missingFacetint then begin
       // FaceGenファイルを新しいパスにコピー&リネームまたは移動&リネーム
-      ManipulateFaceGenFile(oldMeshPath, newMeshPath, removeFaceGen);
-      ManipulateFaceGenFile(oldTexturePath, newTexturePath, removeFaceGen);
+      ManipulateFaceGenFile(oldMeshPath, newMeshPath, MESHMODE, vanillaFaceTintExtracted);
+      ManipulateFaceGenFile(oldTexturePath, newTexturePath, TEXTUREMODE, vanillaFaceTintExtracted);
       ReplaceFaceTintPath(newMeshPath, newTexturePath);
     end;
   end;
